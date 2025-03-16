@@ -34,12 +34,9 @@ pub struct Behavior {
 
 #[derive(Clone, Debug, Subcommand)]
 pub enum Command {
-    /// List modules
-    #[command(visible_alias = "l")]
-    List(ListArgs),
-    /// Check module state
-    #[command(visible_alias = "c")]
-    Check { modules: Vec<String> },
+    /// Display information about modules
+    #[command(visible_alias = "i")]
+    Info(InfoArgs),
     /// Enable modules
     #[command(visible_aliases = ["e"])]
     Enable { modules: Vec<String> },
@@ -52,7 +49,8 @@ pub enum Command {
 }
 
 #[derive(Args, Clone, Debug)]
-pub struct ListArgs {
+pub struct InfoArgs {
+    pub modules: Vec<String>,
     /// Only show enabled modules
     #[arg(long, short = 'E', conflicts_with = "disabled")]
     pub enabled: bool,
@@ -61,18 +59,18 @@ pub struct ListArgs {
     pub disabled: bool,
 }
 
-impl ListArgs {
-    pub fn filter(&self) -> ListFilter {
+impl InfoArgs {
+    pub fn filter(&self) -> InfoFilter {
         match (self.enabled, self.disabled) {
-            (false, false) => ListFilter::All,
-            (true, false) => ListFilter::Enabled,
-            (false, true) => ListFilter::Disabled,
+            (false, false) => InfoFilter::All,
+            (true, false) => InfoFilter::Enabled,
+            (false, true) => InfoFilter::Disabled,
             _ => unreachable!(),
         }
     }
 }
 
-pub enum ListFilter {
+pub enum InfoFilter {
     All,
     Enabled,
     Disabled,
