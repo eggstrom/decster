@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use crate::{
-    cli::{Behavior, Cli, Command, ListFilter},
+    cli::{Behavior, Cli, Command, InfoArgs},
     config::Config,
     paths::Paths,
 };
@@ -15,15 +15,14 @@ pub struct App {
 impl App {
     pub fn run(cli: Cli) -> Result<()> {
         let paths = Paths::new(cli.config)?;
-        let config = Config::parse(paths.home())?;
+        let config = Config::parse(paths.config())?;
         let app = App {
             behavior: cli.behavior,
             paths,
             config,
         };
         match cli.command {
-            Command::List(args) => app.list(args.filter()),
-            Command::Check { modules } => app.check(modules),
+            Command::Info(args) => app.info(args),
             Command::Enable { modules } => app.enable(modules),
             Command::Disable { modules } => app.disable(modules),
             Command::Update { modules } => app.update(modules),
@@ -31,11 +30,7 @@ impl App {
         Ok(())
     }
 
-    fn list(self, args: ListFilter) {
-        todo!()
-    }
-
-    fn check(self, modules: Vec<String>) {
+    fn info(self, args: InfoArgs) {
         todo!()
     }
 

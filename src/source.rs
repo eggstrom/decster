@@ -1,19 +1,32 @@
 use std::{
-    path::{Path, PathBuf},
+    borrow::Borrow,
+    fmt::{self, Display, Formatter},
+    path::PathBuf,
     str::FromStr,
 };
 
+use crossterm::style::Stylize;
 use derive_more::From;
-use serde::Deserialize;
+use serde::{
+    Deserialize, Deserializer,
+    de::{self, Visitor},
+};
 use thiserror::Error;
 
 #[derive(Deserialize)]
 pub enum Source {
+    #[serde(rename = "path")]
     Path(PathBuf),
 }
 
 #[derive(Debug, Deserialize, Eq, Hash, PartialEq)]
 pub struct SourceName(String);
+
+impl Borrow<str> for SourceName {
+    fn borrow(&self) -> &str {
+        &self.0
+    }
+}
 
 #[derive(Debug, Error, PartialEq)]
 #[error("failed to parse source name")]
@@ -32,19 +45,24 @@ impl FromStr for SourceName {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
-pub struct SourcePath {
-    source: SourceName,
-    path: Option<PathBuf>,
+impl Display for SourceName {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.0.as_str().magenta().fmt(f)
+    }
 }
 
-impl SourcePath {
-    pub fn source(&self) -> &str {
-        &self.source.0
-    }
+#[derive(Debug, PartialEq)]
+pub struct SourcePath {
+    pub name: SourceName,
+    pub path: Option<PathBuf>,
+}
 
-    pub fn path(&self) -> Option<&Path> {
-        self.path.as_deref()
+impl Display for SourcePath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match &self.path {
+            Some(path) => write!(f, "{}/{}", self.name, path.display()),
+            None => self.name.fmt(f),
+        }
     }
 }
 
@@ -62,6 +80,32 @@ impl FromStr for SourcePath {
             None => (s.parse()?, None),
             Some((source, path)) => (source.parse()?, Some(PathBuf::from(path))),
         };
-        Ok(SourcePath { source, path })
+        Ok(SourcePath { name: source, path })
+    }
+}
+
+struct SourcePathVisitor;
+
+impl Visitor<'_> for SourcePathVisitor {
+    type Value = SourcePath;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        "a source name followed by an optional path".fmt(formatter)
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        v.parse().map_err(de::Error::custom)
+    }
+}
+
+impl<'de> Deserialize<'de> for SourcePath {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_str(SourcePathVisitor)
     }
 }

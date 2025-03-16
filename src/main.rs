@@ -8,6 +8,7 @@ use crossterm::style::Stylize;
 mod app;
 mod cli;
 mod config;
+mod link;
 mod module;
 mod paths;
 mod source;

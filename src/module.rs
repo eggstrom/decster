@@ -5,23 +5,24 @@ use std::{
 
 use serde::Deserialize;
 
-use crate::source::SourcePath;
+use crate::{
+    link::{IncompleteLink, LinkMethod},
+    source::SourcePath,
+};
 
-#[derive(Debug, Default, Deserialize, PartialEq)]
-pub enum Method {
-    #[serde(rename = "copy")]
-    Copy,
-    #[default]
-    #[serde(rename = "soft-link")]
-    SoftLink,
-    #[serde(rename = "hard-link")]
-    HardLink,
+#[derive(Debug, Deserialize)]
+pub struct Module {
+    #[serde(default)]
+    pub import: HashSet<String>,
+    pub link_method: Option<LinkMethod>,
+    #[serde(default)]
+    pub links: HashMap<PathBuf, SourcePath>,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
-pub struct Module {
-    import: HashSet<String>,
-    method: Option<Method>,
-    #[serde(default)]
-    files: HashMap<PathBuf, SourcePath>,
+impl Module {
+    pub fn links(&self) -> impl Iterator<Item = (IncompleteLink, Option<LinkMethod>)> {
+        self.links
+            .iter()
+            .map(|(path, source)| (IncompleteLink::new(path, source), self.link_method))
+    }
 }
