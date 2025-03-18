@@ -12,10 +12,12 @@ mod link;
 mod module;
 mod paths;
 mod source;
+mod state;
+mod utils;
 
 fn main() {
     if let Err(error) = App::run(Cli::parse()) {
-        eprintln!("{} {error}", "error:".red());
+        eprintln!("{} {error:?}", "error:".red());
         process::exit(1);
     }
 }

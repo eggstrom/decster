@@ -31,15 +31,18 @@ impl Config {
             .ok_or(anyhow!("source `{name}` is not defined"))
     }
 
-    pub fn links(&self, module: &str) -> Option<impl Iterator<Item = Link>> {
-        self.modules.get(module).map(|module| {
-            module
-                .links()
-                .map(|(link, method)| link.with_method(method.unwrap_or(self.link_method)))
-        })
+    pub fn modules(&self) -> impl Iterator<Item = (&String, &Module)> {
+        self.modules.iter()
     }
 
-    pub fn module_names(&self) -> impl Iterator<Item = &str> {
-        self.modules.keys().map(|s| s.as_str())
+    pub fn links(&self, module: &str) -> Result<impl Iterator<Item = Link>> {
+        self.modules
+            .get(module)
+            .map(|module| {
+                module
+                    .links()
+                    .map(|(link, method)| link.with_method(method.unwrap_or(self.link_method)))
+            })
+            .ok_or(anyhow!("module `{module}` is not defined"))
     }
 }

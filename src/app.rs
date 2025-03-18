@@ -4,6 +4,7 @@ use crate::{
     cli::{Behavior, Cli, Command, InfoArgs},
     config::Config,
     paths::Paths,
+    state::State,
 };
 
 pub struct App {
@@ -23,7 +24,7 @@ impl App {
         };
         match cli.command {
             Command::Info(args) => app.info(args),
-            Command::Enable { modules } => app.enable(modules),
+            Command::Enable { modules } => app.enable(modules)?,
             Command::Disable { modules } => app.disable(modules),
             Command::Update { modules } => app.update(modules),
         }
@@ -34,8 +35,19 @@ impl App {
         todo!()
     }
 
-    fn enable(self, modules: Vec<String>) {
-        todo!()
+    fn enable(self, modules: Vec<String>) -> Result<()> {
+        let state = State::builder()?;
+        for module in modules {
+            for link in self.config.links(&module)? {
+                let name = link.source_name();
+                let source = self.config.source(name)?;
+                state.add_source(name, source)?;
+            }
+        }
+
+        let sources = self.paths.data().join("sources");
+        state.build(sources)?;
+        Ok(())
     }
 
     fn disable(self, modules: Vec<String>) {

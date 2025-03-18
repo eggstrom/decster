@@ -13,7 +13,7 @@ use serde::{
 };
 use thiserror::Error;
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub enum Source {
     #[serde(rename = "path")]
     Path(PathBuf),
