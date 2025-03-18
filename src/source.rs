@@ -15,6 +15,8 @@ use thiserror::Error;
 
 #[derive(Debug, Deserialize)]
 pub enum Source {
+    #[serde(rename = "text")]
+    Text(String),
     #[serde(rename = "path")]
     Path(PathBuf),
 }

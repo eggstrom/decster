@@ -9,7 +9,7 @@ use crate::{
     source::{Source, SourceName},
 };
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct Config {
     #[serde(default)]
     link_method: LinkMethod,

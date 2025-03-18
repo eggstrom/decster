@@ -3,6 +3,21 @@ use std::{fs, path::Path};
 use anyhow::Result;
 use walkdir::WalkDir;
 
+pub fn remove_all<P>(path: P) -> Result<()>
+where
+    P: AsRef<Path>,
+{
+    let path = path.as_ref();
+    if path.exists() {
+        if path.is_dir() {
+            fs::remove_dir_all(path)?;
+        } else {
+            fs::remove_file(path)?;
+        }
+    }
+    Ok(())
+}
+
 pub fn copy_all<P, Q>(from: P, to: Q) -> Result<()>
 where
     P: AsRef<Path>,
