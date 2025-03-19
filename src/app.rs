@@ -22,6 +22,7 @@ impl App {
             paths,
             config,
         };
+
         match cli.command {
             Command::Info(args) => app.info(args),
             Command::Enable { modules } => app.enable(modules)?,
@@ -36,17 +37,23 @@ impl App {
     }
 
     fn enable(self, modules: Vec<String>) -> Result<()> {
-        let state = State::builder()?;
-        for module in modules {
+        let state = State::new(self.paths.data())?;
+
+        let builder = state.source_builder()?;
+        for module in modules.iter() {
             for link in self.config.links(&module)? {
                 let name = link.source_name();
                 let source = self.config.source(name)?;
-                state.add_source(name, source)?;
+                builder.add_source(name, source)?;
             }
         }
+        builder.save()?;
 
-        let sources = self.paths.data().join("sources");
-        state.build(sources)?;
+        for module in modules.iter() {
+            self.config
+                .module(module)?
+                .enable(self.config.link_method, self.paths.data())?;
+        }
         Ok(())
     }
 

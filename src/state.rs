@@ -1,38 +1,53 @@
-use std::{fs, path::Path};
+use std::{collections::HashSet, fs, path::Path};
 
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
 use tempfile::TempDir;
 
 use crate::{source::Source, utils};
 
-#[derive(Default, Deserialize, Serialize)]
-pub struct State {}
+pub struct State<'a> {
+    path: &'a Path,
+    enabled: HashSet<String>,
+}
 
-impl State {
-    pub fn builder() -> Result<StateBuilder> {
-        Ok(StateBuilder {
+impl<'a> State<'a> {
+    pub fn new(path: &'a Path) -> Result<Self> {
+        let enabled = fs::read_to_string(path.join("enabled.toml"))
+            .ok()
+            .map(|s| toml::from_str(&s))
+            .transpose()?
+            .unwrap_or(HashSet::new());
+        Ok(State { path, enabled })
+    }
+
+    pub fn save(&self) -> Result<()> {
+        fs::write(
+            self.path.join("enabled.toml"),
+            toml::to_string(&self.enabled)?,
+        )?;
+        Ok(())
+    }
+
+    pub fn source_builder(&self) -> Result<SourceBuilder> {
+        Ok(SourceBuilder {
             dir: TempDir::new()?,
-            state: State::default(),
+            path: self.path,
         })
     }
 }
 
-pub struct StateBuilder {
+pub struct SourceBuilder<'a> {
+    path: &'a Path,
     dir: TempDir,
-    state: State,
 }
 
-impl StateBuilder {
-    pub fn build<P>(self, path: P) -> Result<State>
-    where
-        P: AsRef<Path>,
-    {
-        let path = path.as_ref();
-        utils::remove_all(path)?;
-        fs::create_dir_all(path)?;
-        fs::rename(self.dir.path(), path)?;
-        Ok(self.state)
+impl SourceBuilder<'_> {
+    pub fn save(self) -> Result<()> {
+        let path = self.path.join("sources");
+        utils::remove_all(&path)?;
+        fs::create_dir_all(&path)?;
+        fs::rename(self.dir.path(), &path)?;
+        Ok(())
     }
 
     pub fn add_source(&self, name: &str, source: &Source) -> Result<()> {

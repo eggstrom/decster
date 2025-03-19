@@ -1,7 +1,7 @@
 use std::{
     borrow::Borrow,
     fmt::{self, Display, Formatter},
-    path::PathBuf,
+    path::{Path, PathBuf},
     str::FromStr,
 };
 
@@ -27,6 +27,18 @@ pub struct SourceName(String);
 impl Borrow<str> for SourceName {
     fn borrow(&self) -> &str {
         &self.0
+    }
+}
+
+impl AsRef<str> for SourceName {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<Path> for SourceName {
+    fn as_ref(&self) -> &Path {
+        Path::new(&self.0)
     }
 }
 
@@ -57,6 +69,19 @@ impl Display for SourceName {
 pub struct SourcePath {
     pub name: SourceName,
     pub path: Option<PathBuf>,
+}
+
+impl SourcePath {
+    pub fn path<P>(&self, data_dir: P) -> PathBuf
+    where
+        P: AsRef<Path>,
+    {
+        let source = data_dir.as_ref().join("sources").join(&self.name);
+        match &self.path {
+            Some(path) => source.join(path),
+            None => source,
+        }
+    }
 }
 
 impl Display for SourcePath {

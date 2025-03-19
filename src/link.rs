@@ -1,10 +1,12 @@
 use std::{
     borrow::Borrow,
     fmt::{self, Display, Formatter},
+    fs,
     path::Path,
 };
 
-use crate::source::SourcePath;
+use crate::{source::SourcePath, utils};
+use anyhow::{Context, Result, anyhow};
 use crossterm::style::{Color, Stylize};
 use serde::Deserialize;
 
@@ -81,6 +83,67 @@ impl Link<'_> {
     pub fn color(&self) -> Color {
         self.method().color()
     }
+
+    pub fn exists<P>(&self, data_dir: P) -> bool
+    where
+        P: AsRef<Path>,
+    {
+        match self.method {
+            LinkMethod::SoftLink => self.soft_link_exists(data_dir),
+            _ => self.file_exists(data_dir),
+        }
+    }
+
+    pub fn file_exists<P>(&self, data_dir: P) -> bool
+    where
+        P: AsRef<Path>,
+    {
+        utils::all_files_match(self.path(), self.source().path(data_dir))
+            .is_ok_and(|matches| matches)
+    }
+
+    pub fn soft_link_exists<P>(&self, data_dir: P) -> bool
+    where
+        P: AsRef<Path>,
+    {
+        let path = self.path();
+        path.is_symlink()
+            && path
+                .read_link()
+                .is_ok_and(|link| link == self.source().path(data_dir))
+    }
+
+    pub fn enable<P>(&self, data_dir: P) -> Result<()>
+    where
+        P: AsRef<Path>,
+    {
+        if let Some(dirs) = self.path().parent() {
+            fs::create_dir_all(dirs)?;
+        }
+        match self.method() {
+            LinkMethod::Copy => self.enable_copy(data_dir),
+            LinkMethod::HardLink => self.enable_hard_link(),
+            LinkMethod::SoftLink => self.enable_soft_link(),
+        }
+        .with_context(|| anyhow!("couldn't create link: {self}"))
+    }
+
+    pub fn enable_copy<P>(&self, data_dir: P) -> Result<()>
+    where
+        P: AsRef<Path>,
+    {
+        let data_dir = data_dir.as_ref();
+        utils::copy_all(self.source().path(data_dir), self.path())?;
+        Ok(())
+    }
+
+    pub fn enable_hard_link(&self) -> Result<()> {
+        todo!()
+    }
+
+    pub fn enable_soft_link(&self) -> Result<()> {
+        todo!()
+    }
 }
 
 impl Display for Link<'_> {
@@ -88,9 +151,9 @@ impl Display for Link<'_> {
         write!(
             f,
             "{} {} {} {}",
-            self.source(),
-            "->".with(self.color()),
             self.path().display(),
+            "->".with(self.color()),
+            self.source(),
             self.method()
         )
     }

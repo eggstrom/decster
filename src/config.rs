@@ -12,7 +12,7 @@ use crate::{
 #[derive(Debug, Deserialize)]
 pub struct Config {
     #[serde(default)]
-    link_method: LinkMethod,
+    pub link_method: LinkMethod,
     #[serde(default)]
     sources: HashMap<SourceName, Source>,
     #[serde(default)]
@@ -20,7 +20,10 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn parse(path: impl AsRef<Path>) -> Result<Self> {
+    pub fn parse<P>(path: P) -> Result<Self>
+    where
+        P: AsRef<Path>,
+    {
         let path = path.as_ref().join("config.toml");
         Ok(toml::from_str(&fs::read_to_string(path)?)?)
     }
@@ -31,7 +34,13 @@ impl Config {
             .ok_or(anyhow!("source `{name}` is not defined"))
     }
 
-    pub fn modules(&self) -> impl Iterator<Item = (&String, &Module)> {
+    pub fn module(&self, name: &str) -> Result<&Module> {
+        self.modules
+            .get(name)
+            .ok_or(anyhow!("module `{name}` is not defined"))
+    }
+
+    pub fn modules<I>(&self) -> impl Iterator<Item = (&String, &Module)> {
         self.modules.iter()
     }
 
