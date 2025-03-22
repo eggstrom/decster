@@ -1,14 +1,14 @@
 use std::{
     collections::{HashMap, HashSet},
     fs,
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
 use anyhow::{Result, bail};
 use serde::Deserialize;
 
 use crate::{
-    link::{IncompleteLink, LinkMethod},
+    link::{Link, LinkMethod},
     source::SourcePath,
     utils,
 };
@@ -23,24 +23,21 @@ pub struct Module {
 }
 
 impl Module {
-    pub fn links(&self) -> impl Iterator<Item = (IncompleteLink, Option<LinkMethod>)> {
-        self.links
-            .iter()
-            .map(|(path, source)| (IncompleteLink::new(path, source), self.link_method))
+    pub fn links(&self, default_method: LinkMethod) -> impl Iterator<Item = Link> {
+        self.links.iter().map(move |(path, source)| {
+            Link::new(path, source, self.link_method.unwrap_or(default_method))
+        })
     }
 
     pub fn enable(&self, default_method: LinkMethod) -> Result<()> {
         let mut created_files = Vec::new();
 
-        for link in self
-            .links()
-            .map(|(link, method)| link.with_method(method.unwrap_or(default_method)))
-        {
-            if let Some(dirs) = link.path().parent() {
+        for link in self.links(default_method) {
+            if let Some(dirs) = link.path.parent() {
                 fs::create_dir_all(dirs)?;
             }
             match link.enable() {
-                Ok(()) => created_files.push(link.path().to_path_buf()),
+                Ok(()) => created_files.push(link.path.to_path_buf()),
                 Err(error) => {
                     for path in created_files {
                         utils::remove_all(path)?;

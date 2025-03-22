@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, path::Path};
+use std::{collections::HashMap, default, fs, path::Path};
 
 use anyhow::{Result, anyhow};
 use serde::Deserialize;
@@ -46,11 +46,7 @@ impl Config {
     pub fn links(&self, module: &str) -> Result<impl Iterator<Item = Link>> {
         self.modules
             .get(module)
-            .map(|module| {
-                module
-                    .links()
-                    .map(|(link, method)| link.with_method(method.unwrap_or(self.link_method)))
-            })
+            .map(|module| module.links(self.link_method))
             .ok_or(anyhow!("module `{module}` is not defined"))
     }
 }

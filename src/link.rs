@@ -1,5 +1,4 @@
 use std::{
-    borrow::Borrow,
     fmt::{self, Display, Formatter},
     fs,
     path::Path,
@@ -10,29 +9,12 @@ use anyhow::{Context, Result, anyhow};
 use crossterm::style::{Color, Stylize};
 use serde::Deserialize;
 
-pub struct IncompleteLink<'a> {
-    pub path: &'a Path,
-    pub source: &'a SourcePath,
-}
-
-impl<'a> IncompleteLink<'a> {
-    pub fn new(path: &'a Path, source: &'a SourcePath) -> Self {
-        IncompleteLink { path, source }
-    }
-
-    pub fn with_method(self, method: LinkMethod) -> Link<'a> {
-        Link { link: self, method }
-    }
-}
-
 #[derive(Clone, Copy, Debug, Default, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum LinkMethod {
-    #[serde(rename = "copy")]
     Copy,
     #[default]
-    #[serde(rename = "soft-link")]
     SoftLink,
-    #[serde(rename = "hard-link")]
     HardLink,
 }
 
@@ -59,29 +41,22 @@ impl Display for LinkMethod {
 }
 
 pub struct Link<'a> {
-    link: IncompleteLink<'a>,
-    method: LinkMethod,
+    pub path: &'a Path,
+    pub source: &'a SourcePath,
+    pub method: LinkMethod,
 }
 
-impl Link<'_> {
-    pub fn path(&self) -> &Path {
-        self.link.path
-    }
-
-    pub fn source(&self) -> &SourcePath {
-        self.link.source
+impl<'a> Link<'a> {
+    pub fn new(path: &'a Path, source: &'a SourcePath, method: LinkMethod) -> Self {
+        Link {
+            path,
+            source,
+            method,
+        }
     }
 
     pub fn source_name(&self) -> &str {
-        self.source().name.borrow()
-    }
-
-    pub fn method(&self) -> LinkMethod {
-        self.method
-    }
-
-    pub fn color(&self) -> Color {
-        self.method().color()
+        self.source.name.as_ref()
     }
 
     pub fn exists(&self) -> Result<bool> {
@@ -92,19 +67,19 @@ impl Link<'_> {
     }
 
     pub fn file_exists(&self) -> Result<bool> {
-        utils::all_files_match(self.path(), self.source().path()?)
+        utils::all_files_match(self.path, self.source.path()?)
     }
 
     pub fn soft_link_exists(&self) -> Result<bool> {
-        let path = self.path();
-        Ok(path.is_symlink() && path.read_link()? == self.source().path()?)
+        let path = self.path;
+        Ok(path.is_symlink() && path.read_link()? == self.source.path()?)
     }
 
     pub fn enable(&self) -> Result<()> {
-        if let Some(dirs) = self.path().parent() {
+        if let Some(dirs) = self.path.parent() {
             fs::create_dir_all(dirs)?;
         }
-        match self.method() {
+        match self.method {
             LinkMethod::Copy => self.enable_copy(),
             LinkMethod::HardLink => self.enable_hard_link(),
             LinkMethod::SoftLink => self.enable_soft_link(),
@@ -112,16 +87,16 @@ impl Link<'_> {
         .with_context(|| anyhow!("couldn't create link: {self}"))
     }
 
-    pub fn enable_copy(&self) -> Result<()> {
-        fs::rename(self.source().path()?, self.path())?;
+    fn enable_copy(&self) -> Result<()> {
+        fs::rename(self.source.path()?, self.path)?;
         Ok(())
     }
 
-    pub fn enable_hard_link(&self) -> Result<()> {
+    fn enable_hard_link(&self) -> Result<()> {
         todo!()
     }
 
-    pub fn enable_soft_link(&self) -> Result<()> {
+    fn enable_soft_link(&self) -> Result<()> {
         todo!()
     }
 }
@@ -131,10 +106,10 @@ impl Display for Link<'_> {
         write!(
             f,
             "{} {} {} {}",
-            self.path().display(),
-            "->".with(self.color()),
-            self.source(),
-            self.method()
+            self.path.display(),
+            "->".with(self.method.color()),
+            self.source,
+            self.method
         )
     }
 }
