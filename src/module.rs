@@ -29,6 +29,12 @@ impl Module {
         })
     }
 
+    pub fn is_enabled(&self, default_method: LinkMethod) -> Result<bool> {
+        Ok(self
+            .links(default_method)
+            .all(|link| link.is_enabled().is_ok_and(|enabled| enabled)))
+    }
+
     pub fn enable(&self, default_method: LinkMethod) -> Result<()> {
         let mut created_files = Vec::new();
 
@@ -50,4 +56,10 @@ impl Module {
     }
 
     pub fn disable(&self) {}
+}
+
+pub enum ModuleFilter {
+    All,
+    Enabled,
+    Disabled,
 }

@@ -1,11 +1,15 @@
-use std::{collections::HashMap, default, fs, path::Path};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    path::Path,
+};
 
 use anyhow::{Result, anyhow};
 use serde::Deserialize;
 
 use crate::{
     link::{Link, LinkMethod},
-    module::Module,
+    module::{Module, ModuleFilter},
     paths,
     source::{Source, SourceName},
 };
@@ -39,8 +43,23 @@ impl Config {
             .ok_or(anyhow!("module `{name}` is not defined"))
     }
 
-    pub fn modules<I>(&self) -> impl Iterator<Item = (&String, &Module)> {
-        self.modules.iter()
+    pub fn modules(
+        &self,
+        names: HashSet<String>,
+        filter: ModuleFilter,
+    ) -> impl Iterator<Item = (&str, &Module)> {
+        self.modules.iter().filter_map(move |(name, module)| {
+            ((names.is_empty() || names.contains(name))
+                && match module.is_enabled(self.link_method) {
+                    Err(_) => true,
+                    Ok(enabled) => match filter {
+                        ModuleFilter::All => true,
+                        ModuleFilter::Enabled => enabled,
+                        ModuleFilter::Disabled => !enabled,
+                    },
+                })
+            .then_some((name.as_str(), module))
+        })
     }
 
     pub fn links(&self, module: &str) -> Result<impl Iterator<Item = Link>> {

@@ -1,6 +1,8 @@
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf};
 
 use clap::{Args, Parser, Subcommand};
+
+use crate::module::ModuleFilter;
 
 #[derive(Debug, Parser)]
 pub struct Cli {
@@ -60,18 +62,14 @@ pub struct InfoArgs {
 }
 
 impl InfoArgs {
-    pub fn filter(&self) -> InfoFilter {
-        match (self.enabled, self.disabled) {
-            (false, false) => InfoFilter::All,
-            (true, false) => InfoFilter::Enabled,
-            (false, true) => InfoFilter::Disabled,
-            _ => unreachable!(),
-        }
+    pub fn modules(self) -> (HashSet<String>, ModuleFilter) {
+        (
+            self.modules.into_iter().collect(),
+            match () {
+                _ if self.enabled => ModuleFilter::Enabled,
+                _ if self.disabled => ModuleFilter::Disabled,
+                _ => ModuleFilter::All,
+            },
+        )
     }
-}
-
-pub enum InfoFilter {
-    All,
-    Enabled,
-    Disabled,
 }

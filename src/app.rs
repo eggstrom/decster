@@ -20,7 +20,7 @@ impl App {
         };
 
         match cli.command {
-            Command::Info(args) => app.info(args),
+            Command::Info(args) => app.info(args)?,
             Command::Enable { modules } => app.enable(modules)?,
             Command::Disable { modules } => app.disable(modules),
             Command::Update { modules } => app.update(modules),
@@ -28,8 +28,12 @@ impl App {
         Ok(())
     }
 
-    fn info(self, args: InfoArgs) {
-        todo!()
+    fn info(self, args: InfoArgs) -> Result<()> {
+        let (names, filter) = args.modules();
+        for (name, module) in self.config.modules(names, filter) {
+            todo!()
+        }
+        Ok(())
     }
 
     fn enable(self, modules: Vec<String>) -> Result<()> {
