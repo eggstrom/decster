@@ -5,6 +5,7 @@ use std::{
     str::FromStr,
 };
 
+use anyhow::Result;
 use crossterm::style::Stylize;
 use derive_more::From;
 use serde::{
@@ -12,6 +13,8 @@ use serde::{
     de::{self, Visitor},
 };
 use thiserror::Error;
+
+use crate::paths;
 
 #[derive(Debug, Deserialize)]
 pub enum Source {
@@ -72,15 +75,12 @@ pub struct SourcePath {
 }
 
 impl SourcePath {
-    pub fn path<P>(&self, data_dir: P) -> PathBuf
-    where
-        P: AsRef<Path>,
-    {
-        let source = data_dir.as_ref().join("sources").join(&self.name);
-        match &self.path {
-            Some(path) => source.join(path),
-            None => source,
+    pub fn path(&self) -> Result<PathBuf> {
+        let mut full_path = paths::sources()?.join(&self.name);
+        if let Some(path) = &self.path {
+            full_path.push(path);
         }
+        Ok(full_path)
     }
 }
 

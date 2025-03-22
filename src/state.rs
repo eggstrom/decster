@@ -3,26 +3,25 @@ use std::{collections::HashSet, fs, path::Path};
 use anyhow::Result;
 use tempfile::TempDir;
 
-use crate::{source::Source, utils};
+use crate::{paths, source::Source, utils};
 
-pub struct State<'a> {
-    path: &'a Path,
+pub struct State {
     enabled: HashSet<String>,
 }
 
-impl<'a> State<'a> {
-    pub fn new(path: &'a Path) -> Result<Self> {
-        let enabled = fs::read_to_string(path.join("enabled.toml"))
+impl State {
+    pub fn new() -> Result<Self> {
+        let enabled = fs::read_to_string(paths::data()?.join("enabled.toml"))
             .ok()
             .map(|s| toml::from_str(&s))
             .transpose()?
             .unwrap_or(HashSet::new());
-        Ok(State { path, enabled })
+        Ok(State { enabled })
     }
 
     pub fn save(&self) -> Result<()> {
         fs::write(
-            self.path.join("enabled.toml"),
+            paths::data()?.join("enabled.toml"),
             toml::to_string(&self.enabled)?,
         )?;
         Ok(())
@@ -31,19 +30,17 @@ impl<'a> State<'a> {
     pub fn source_builder(&self) -> Result<SourceBuilder> {
         Ok(SourceBuilder {
             dir: TempDir::new()?,
-            path: self.path,
         })
     }
 }
 
-pub struct SourceBuilder<'a> {
-    path: &'a Path,
+pub struct SourceBuilder {
     dir: TempDir,
 }
 
-impl SourceBuilder<'_> {
+impl SourceBuilder {
     pub fn save(self) -> Result<()> {
-        let path = self.path.join("sources");
+        let path = paths::sources()?;
         utils::remove_all(&path)?;
         fs::create_dir_all(&path)?;
         fs::rename(self.dir.path(), &path)?;

@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use walkdir::WalkDir;
 
 /// Removes file or directory.

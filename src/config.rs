@@ -6,6 +6,7 @@ use serde::Deserialize;
 use crate::{
     link::{Link, LinkMethod},
     module::Module,
+    paths,
     source::{Source, SourceName},
 };
 
@@ -20,11 +21,8 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn parse<P>(path: P) -> Result<Self>
-    where
-        P: AsRef<Path>,
-    {
-        let path = path.as_ref().join("config.toml");
+    pub fn parse(path: Option<&Path>) -> Result<Self> {
+        let path = path.unwrap_or(paths::config()?).join("config.toml");
         Ok(toml::from_str(&fs::read_to_string(path)?)?)
     }
 

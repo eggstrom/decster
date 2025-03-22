@@ -84,56 +84,36 @@ impl Link<'_> {
         self.method().color()
     }
 
-    pub fn exists<P>(&self, data_dir: P) -> bool
-    where
-        P: AsRef<Path>,
-    {
+    pub fn exists(&self) -> Result<bool> {
         match self.method {
-            LinkMethod::SoftLink => self.soft_link_exists(data_dir),
-            _ => self.file_exists(data_dir),
+            LinkMethod::SoftLink => self.soft_link_exists(),
+            _ => self.file_exists(),
         }
     }
 
-    pub fn file_exists<P>(&self, data_dir: P) -> bool
-    where
-        P: AsRef<Path>,
-    {
-        utils::all_files_match(self.path(), self.source().path(data_dir))
-            .is_ok_and(|matches| matches)
+    pub fn file_exists(&self) -> Result<bool> {
+        utils::all_files_match(self.path(), self.source().path()?)
     }
 
-    pub fn soft_link_exists<P>(&self, data_dir: P) -> bool
-    where
-        P: AsRef<Path>,
-    {
+    pub fn soft_link_exists(&self) -> Result<bool> {
         let path = self.path();
-        path.is_symlink()
-            && path
-                .read_link()
-                .is_ok_and(|link| link == self.source().path(data_dir))
+        Ok(path.is_symlink() && path.read_link()? == self.source().path()?)
     }
 
-    pub fn enable<P>(&self, data_dir: P) -> Result<()>
-    where
-        P: AsRef<Path>,
-    {
+    pub fn enable(&self) -> Result<()> {
         if let Some(dirs) = self.path().parent() {
             fs::create_dir_all(dirs)?;
         }
         match self.method() {
-            LinkMethod::Copy => self.enable_copy(data_dir),
+            LinkMethod::Copy => self.enable_copy(),
             LinkMethod::HardLink => self.enable_hard_link(),
             LinkMethod::SoftLink => self.enable_soft_link(),
         }
         .with_context(|| anyhow!("couldn't create link: {self}"))
     }
 
-    pub fn enable_copy<P>(&self, data_dir: P) -> Result<()>
-    where
-        P: AsRef<Path>,
-    {
-        let data_dir = data_dir.as_ref();
-        utils::copy_all(self.source().path(data_dir), self.path())?;
+    pub fn enable_copy(&self) -> Result<()> {
+        fs::rename(self.source().path()?, self.path())?;
         Ok(())
     }
 

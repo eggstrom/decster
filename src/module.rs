@@ -29,11 +29,7 @@ impl Module {
             .map(|(path, source)| (IncompleteLink::new(path, source), self.link_method))
     }
 
-    pub fn enable<P>(&self, default_method: LinkMethod, data_dir: P) -> Result<()>
-    where
-        P: AsRef<Path>,
-    {
-        let data_dir = data_dir.as_ref();
+    pub fn enable(&self, default_method: LinkMethod) -> Result<()> {
         let mut created_files = Vec::new();
 
         for link in self
@@ -43,7 +39,7 @@ impl Module {
             if let Some(dirs) = link.path().parent() {
                 fs::create_dir_all(dirs)?;
             }
-            match link.enable(data_dir) {
+            match link.enable() {
                 Ok(()) => created_files.push(link.path().to_path_buf()),
                 Err(error) => {
                     for path in created_files {
