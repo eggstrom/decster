@@ -11,6 +11,7 @@ use crate::{
 };
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct Config {
     #[serde(default)]
     pub link_method: LinkMethod,

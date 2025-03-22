@@ -17,10 +17,9 @@ use thiserror::Error;
 use crate::paths;
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Source {
-    #[serde(rename = "text")]
     Text(String),
-    #[serde(rename = "path")]
     Path(PathBuf),
 }
 
