@@ -39,14 +39,12 @@ impl Module {
         let mut created_files = Vec::new();
 
         for link in self.links(default_method) {
-            if let Some(dirs) = link.path.parent() {
-                fs::create_dir_all(dirs)?;
-            }
             match link.enable() {
                 Ok(()) => created_files.push(link.path.to_path_buf()),
                 Err(error) => {
-                    for path in created_files {
+                    for path in created_files.iter() {
                         utils::remove_all(path)?;
+                        utils::remove_dir_components(path);
                     }
                     bail!(error);
                 }
@@ -55,7 +53,12 @@ impl Module {
         Ok(())
     }
 
-    pub fn disable(&self) {}
+    pub fn disable(&self, default_method: LinkMethod) -> Result<()> {
+        for link in self.links(default_method) {
+            link.disable()?;
+        }
+        Ok(())
+    }
 }
 
 pub enum ModuleFilter {

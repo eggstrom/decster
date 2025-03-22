@@ -67,7 +67,7 @@ impl<'a> Link<'a> {
     }
 
     fn is_file_enabled(&self) -> Result<bool> {
-        utils::all_files_match(self.path, self.source.path()?)
+        utils::all_match(self.path, self.source.path()?)
     }
 
     fn is_soft_link_enabled(&self) -> Result<bool> {
@@ -88,7 +88,7 @@ impl<'a> Link<'a> {
     }
 
     fn enable_copy(&self) -> Result<()> {
-        fs::rename(self.source.path()?, self.path)?;
+        utils::copy_all(self.source.path()?, self.path)?;
         Ok(())
     }
 
@@ -98,6 +98,21 @@ impl<'a> Link<'a> {
 
     fn enable_soft_link(&self) -> Result<()> {
         todo!()
+    }
+
+    pub fn disable(&self) -> Result<()> {
+        match self.method {
+            LinkMethod::SoftLink => self.disable_soft_link(),
+            _ => self.disable_file(),
+        }
+    }
+
+    fn disable_file(&self) -> Result<()> {
+        Ok(())
+    }
+
+    fn disable_soft_link(&self) -> Result<()> {
+        Ok(())
     }
 }
 

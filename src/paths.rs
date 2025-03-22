@@ -12,6 +12,8 @@ static DATA: LazyLock<Option<PathBuf>> =
     LazyLock::new(|| dirs::data_dir().map(|path| path.join("decster")));
 static SOURCES: LazyLock<Option<PathBuf>> =
     LazyLock::new(|| DATA.as_deref().map(|path| path.join("sources")));
+static STATE: LazyLock<Option<PathBuf>> =
+    LazyLock::new(|| DATA.as_deref().map(|path| path.join("state")));
 
 pub fn home<'a>() -> Result<&'a Path> {
     HOME.as_deref()
@@ -33,4 +35,8 @@ pub fn sources<'a>() -> Result<&'a Path> {
     SOURCES
         .as_deref()
         .ok_or(anyhow!("couldn't find source directory"))
+}
+
+pub fn state<'a>() -> Result<&'a Path> {
+    STATE.as_deref().ok_or(anyhow!("couldn't find state file"))
 }

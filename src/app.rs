@@ -37,7 +37,7 @@ impl App {
     }
 
     fn enable(self, modules: Vec<String>) -> Result<()> {
-        let state = State::new()?;
+        let state = State::load()?;
 
         let builder = state.source_builder()?;
         for module in modules.iter() {
