@@ -6,6 +6,7 @@ use std::{
 };
 
 use anyhow::Result;
+use log::info;
 use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 
@@ -86,8 +87,13 @@ where
     Q: AsRef<Path>,
 {
     let (from, to) = (from.as_ref(), to.as_ref());
+    info!(
+        "Recursively copying `{}` to `{}`",
+        from.display(),
+        to.display()
+    );
+
     if !from.is_dir() {
-        println!("  {} -> {}", from.display(), to.display());
         fs::copy(from, to)?;
         return Ok(());
     }
@@ -98,8 +104,6 @@ where
                 let path = path.path();
                 let relative_path = path.strip_prefix(from)?;
                 let to = to.join(relative_path);
-
-                println!("  {} -> {}", path.display(), to.display());
 
                 if path.is_dir() {
                     fs::create_dir(&to)?;

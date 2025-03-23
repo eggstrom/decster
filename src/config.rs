@@ -5,6 +5,7 @@ use std::{
 };
 
 use anyhow::{Result, anyhow};
+use log::info;
 use serde::Deserialize;
 
 use crate::{
@@ -28,6 +29,7 @@ pub struct Config {
 impl Config {
     pub fn parse(path: Option<&Path>) -> Result<Self> {
         let path = path.unwrap_or(paths::config()?).join("config.toml");
+        info!("Parsing config at {}", path.display());
         Ok(toml::from_str(&fs::read_to_string(path)?)?)
     }
 

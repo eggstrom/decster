@@ -8,6 +8,7 @@ use std::{
 
 use anyhow::Result;
 use bincode::{Decode, Encode, config::Configuration};
+use log::info;
 use tempfile::TempDir;
 
 use crate::{
@@ -161,11 +162,7 @@ impl SourceBuilder {
 
     fn add_text_source(&self, name: &str, text: &str) -> Result<()> {
         let path = self.dir.path().join(name);
-        println!("Adding source: {} (text)", name);
-
-        if path.is_dir() {
-            fs::remove_dir_all(&path)?;
-        }
+        info!("Adding source: {} (text)", name);
         fs::write(path, text)?;
         Ok(())
     }
@@ -175,7 +172,7 @@ impl SourceBuilder {
         P: AsRef<Path>,
     {
         let path = path.as_ref();
-        println!("Adding source: {} (path: {})", name, path.display());
+        info!("Adding source: {} (path: {})", name, path.display());
 
         utils::copy_all(path, self.dir.path().join(name))?;
         Ok(())

@@ -1,4 +1,5 @@
 use anyhow::Result;
+use log::info;
 
 use crate::{
     cli::{Behavior, Cli, Command, InfoArgs},
@@ -44,6 +45,8 @@ impl App {
     }
 
     fn enable(&mut self, modules: Vec<String>) -> Result<()> {
+        info!("Enabling modules: {:?}", modules);
+
         let builder = self.state.source_builder()?;
         for module in modules.iter() {
             for link in self.config.links(&module)? {
@@ -55,6 +58,7 @@ impl App {
         builder.save()?;
 
         for module in modules.iter() {
+            info!("Enabling module `{module}`");
             self.config
                 .module(module)?
                 .enable(self.config.link_method, &mut self.state)?;
@@ -65,6 +69,7 @@ impl App {
 
     fn disable(&mut self, modules: Vec<String>) -> Result<()> {
         for module in modules.iter() {
+            info!("Disabling module `{module}`");
             self.config
                 .module(module)?
                 .disable(self.config.link_method, &mut self.state)?;
