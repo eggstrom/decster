@@ -6,11 +6,10 @@ use std::{
 
 use anyhow::{Result, anyhow};
 use crossterm::style::Stylize;
-use log::info;
 use serde::Deserialize;
 
 use crate::{
-    link::{Link, LinkMethod},
+    link::LinkMethod,
     module::{Module, ModuleFilter},
     paths,
     source::{Source, SourceName},
@@ -30,20 +29,13 @@ pub struct Config {
 impl Config {
     pub fn parse(path: Option<&Path>) -> Result<Self> {
         let path = path.unwrap_or(paths::config()?).join("config.toml");
-        info!("Parsing config at {}", path.display());
         Ok(toml::from_str(&fs::read_to_string(path)?)?)
     }
 
-    pub fn source(&self, name: &str) -> Result<&Source> {
+    pub fn source(&self, name: &SourceName) -> Result<&Source> {
         self.sources
             .get(name)
             .ok_or(anyhow!("Coudln't find source: {}", name.magenta()))
-    }
-
-    pub fn module(&self, name: &str) -> Result<&Module> {
-        self.modules
-            .get(name)
-            .ok_or(anyhow!("Couldn't find module: {}", name.magenta()))
     }
 
     pub fn modules(
@@ -53,22 +45,12 @@ impl Config {
     ) -> impl Iterator<Item = (&str, &Module)> {
         self.modules.iter().filter_map(move |(name, module)| {
             ((names.is_empty() || names.contains(name))
-                && match module.is_enabled(self.link_method) {
-                    Err(_) => true,
-                    Ok(enabled) => match filter {
-                        ModuleFilter::All => true,
-                        ModuleFilter::Enabled => enabled,
-                        ModuleFilter::Disabled => !enabled,
-                    },
+                && match filter {
+                    ModuleFilter::All => true,
+                    ModuleFilter::Enabled => true,
+                    ModuleFilter::Disabled => true,
                 })
             .then_some((name.as_str(), module))
         })
-    }
-
-    pub fn links(&self, module: &str) -> Result<impl Iterator<Item = Link>> {
-        self.modules
-            .get(module)
-            .map(|module| module.links(self.link_method))
-            .ok_or(anyhow!("Couldn't find module: {}", module.magenta()))
     }
 }

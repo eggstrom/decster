@@ -56,23 +56,7 @@ impl<'a> Link<'a> {
     }
 
     pub fn source_name(&self) -> &str {
-        self.source.name.as_ref()
-    }
-
-    pub fn is_enabled(&self) -> Result<bool> {
-        match self.method {
-            LinkMethod::SoftLink => self.is_soft_link_enabled(),
-            _ => self.is_file_enabled(),
-        }
-    }
-
-    fn is_file_enabled(&self) -> Result<bool> {
-        utils::all_match(self.path, self.source.path()?)
-    }
-
-    fn is_soft_link_enabled(&self) -> Result<bool> {
-        let path = self.path;
-        Ok(path.is_symlink() && path.read_link()? == self.source.path()?)
+        &self.source.name
     }
 
     pub fn enable(&self) -> Result<()> {

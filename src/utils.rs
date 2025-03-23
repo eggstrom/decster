@@ -6,7 +6,6 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use log::info;
 use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 
@@ -92,14 +91,11 @@ where
     Q: AsRef<Path>,
 {
     let (from, to) = (from.as_ref(), to.as_ref());
-    info!(
-        "Recursively copying: {} -> {}",
-        from.display(),
-        to.display()
-    );
 
     if !from.is_dir() {
-        fs::copy(from, to).with_context(|| "Couldn't copy file: {from} -> {to}")?;
+        fs::copy(from, to).with_context(|| {
+            format!("Couldn't copy file: {} -> {}", from.display(), to.display())
+        })?;
         return Ok(());
     }
 
@@ -109,7 +105,7 @@ where
                 let path = path.path();
                 let relative_path = path
                     .strip_prefix(from)
-                    .expect("Couldn't strip prefix while recursively copying");
+                    .expect("`path` should always start with `from`");
                 let to = to.join(relative_path);
 
                 if path.is_dir() {
@@ -142,19 +138,20 @@ where
     }
 }
 
-/// Removes file or directory recursively.
+/// Recursively removes `path` if it exists.
 pub fn remove_all<P>(path: P) -> Result<()>
 where
     P: AsRef<Path>,
 {
     let path = path.as_ref();
-    if path.is_dir() {
-        fs::remove_dir_all(path).with_context(|| {
-            format!("Couldn't recursively delete directory: {}", path.display())
-        })?;
-    } else {
-        fs::remove_file(path)
-            .with_context(|| format!("Couldn't remove file: {}", path.display()))?;
+    if path.exists() {
+        if path.is_dir() {
+            fs::remove_dir_all(path)
+                .with_context(|| format!("Couldn't remove directory: {}", path.display()))?;
+        } else {
+            fs::remove_file(path)
+                .with_context(|| format!("Couldn't remove file: {}", path.display()))?;
+        }
     }
     Ok(())
 }

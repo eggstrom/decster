@@ -14,7 +14,7 @@ use log::info;
 use crate::{
     link::LinkMethod,
     paths,
-    source::Source,
+    source::{Source, SourceName},
     utils::{self, Sha256Hash},
 };
 
@@ -25,6 +25,9 @@ pub struct State {
 
 impl State {
     pub fn load() -> Result<Self> {
+        let path = paths::sources()?;
+        fs::create_dir_all(path)
+            .with_context(|| format!("Couldn't create path: {}", path.display()))?;
         Ok(File::open(paths::state()?)
             .ok()
             .and_then(|mut file| bincode::decode_from_std_read(&mut file, Self::bin_config()).ok())
@@ -41,17 +44,12 @@ impl State {
         bincode::config::standard()
     }
 
-    /// Checks whether `path` can be written to due to not existing, being
-    /// an empty directory, or being owned by the program.
-    pub fn check<P>(&self, path: P) -> bool
+    pub fn is_writable<P>(&self, path: P) -> bool
     where
         P: AsRef<Path>,
     {
         let path = path.as_ref();
-        path.metadata()
-            .is_ok_and(|metadata| !metadata.permissions().readonly())
-            || (!path.exists())
-            || (path.read_dir().is_ok_and(|mut dir| dir.next().is_none()))
+        !path.exists()
             || self
                 .owned_files
                 .get(path)
@@ -61,14 +59,19 @@ impl State {
 
     pub fn add_file<P>(&mut self, path: P, method: LinkMethod) -> Result<()>
     where
-        P: Into<PathBuf>,
+        P: AsRef<Path>,
     {
-        let path = path.into();
-        let file = match method {
-            LinkMethod::Copy | LinkMethod::HardLink => FileInfo::file_at(&path)?,
-            LinkMethod::SoftLink => FileInfo::link_at(&path)?,
-        };
-        self.owned_files.insert(path, file);
+        let path = path.as_ref();
+        if path.is_dir() {
+            return Ok(());
+        }
+        self.owned_files.insert(
+            path.to_path_buf(),
+            match method {
+                LinkMethod::SoftLink => FileInfo::new_link(path),
+                _ => FileInfo::new_file(path),
+            }?,
+        );
         Ok(())
     }
 
@@ -79,7 +82,7 @@ impl State {
         self.owned_files.remove(path.as_ref());
     }
 
-    pub fn add_source(&self, name: &str, source: &Source) -> Result<()> {
+    pub fn add_source(&self, name: &SourceName, source: &Source) -> Result<()> {
         match source {
             Source::Text(text) => self.add_text_source(name, text),
             Source::Path(path) => self.add_path_source(name, path),
@@ -87,15 +90,16 @@ impl State {
         .with_context(|| format!("Couldn't add source: {}", name.magenta()))
     }
 
-    fn add_text_source(&self, name: &str, text: &str) -> Result<()> {
-        let source_path = paths::sources()?.join(name);
+    fn add_text_source(&self, name: &SourceName, text: &str) -> Result<()> {
         info!("Adding text source: {}", name.magenta());
+
+        let source_path = paths::sources()?.join(name);
         fs::write(&source_path, text)
             .with_context(|| format!("Couldn't write to file: {}", source_path.display()))?;
         Ok(())
     }
 
-    fn add_path_source<P>(&self, name: &str, path: P) -> Result<()>
+    fn add_path_source<P>(&self, name: &SourceName, path: P) -> Result<()>
     where
         P: AsRef<Path>,
     {
@@ -103,6 +107,7 @@ impl State {
         info!("Adding path source: {}", name.magenta());
 
         let source_path = paths::sources()?.join(name);
+        utils::remove_all(&source_path)?;
         utils::copy_all(path, &source_path)?;
         Ok(())
     }
@@ -124,24 +129,29 @@ enum FileInfo {
 }
 
 impl FileInfo {
-    pub fn file_at<P>(path: P) -> Result<Self>
-    where
-        P: AsRef<Path>,
-    {
-        let path = path.as_ref();
-        Ok(FileInfo::File {
-            size: path.metadata()?.size(),
-            hash: utils::hash_file(path)?,
-        })
-    }
-
-    pub fn link_at<P>(path: P) -> Result<Self>
+    pub fn new_link<P>(path: P) -> Result<Self>
     where
         P: AsRef<Path>,
     {
         let path = path.as_ref();
         Ok(FileInfo::Link {
-            path: path.read_link()?,
+            path: path
+                .read_link()
+                .with_context(|| format!("Couldn't read symlink: {}", path.display()))?,
+        })
+    }
+
+    pub fn new_file<P>(path: P) -> Result<Self>
+    where
+        P: AsRef<Path>,
+    {
+        let path = path.as_ref();
+        Ok(FileInfo::File {
+            size: path
+                .metadata()
+                .with_context(|| format!("Couldn't read file metadata: {}", path.display()))?
+                .size(),
+            hash: utils::hash_file(path)?,
         })
     }
 

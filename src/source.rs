@@ -1,6 +1,6 @@
 use std::{
-    borrow::Borrow,
     fmt::{self, Display, Formatter},
+    ops::Deref,
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -26,14 +26,10 @@ pub enum Source {
 #[derive(Debug, Deserialize, Eq, Hash, PartialEq)]
 pub struct SourceName(String);
 
-impl Borrow<str> for SourceName {
-    fn borrow(&self) -> &str {
-        &self.0
-    }
-}
+impl Deref for SourceName {
+    type Target = str;
 
-impl AsRef<str> for SourceName {
-    fn as_ref(&self) -> &str {
+    fn deref(&self) -> &Self::Target {
         &self.0
     }
 }

@@ -3,22 +3,25 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{Result, bail};
+use anyhow::Result;
+use log::{error, info, warn};
 use serde::Deserialize;
 
 use crate::{
+    config::Config,
     link::{Link, LinkMethod},
     source::SourcePath,
     state::State,
+    utils,
 };
 
 #[derive(Debug, Deserialize)]
 pub struct Module {
     #[serde(default)]
-    pub import: HashSet<String>,
-    pub link_method: Option<LinkMethod>,
+    import: HashSet<String>,
+    link_method: Option<LinkMethod>,
     #[serde(default)]
-    pub links: HashMap<PathBuf, SourcePath>,
+    links: HashMap<PathBuf, SourcePath>,
 }
 
 impl Module {
@@ -28,46 +31,59 @@ impl Module {
         })
     }
 
-    pub fn unwrittable_paths(&self, default_method: LinkMethod, state: &mut State) -> Vec<&Path> {
-        let mut unwrittable_paths = Vec::new();
-        for link in self.links(default_method) {
-            if state.check(link.path) {
-                unwrittable_paths.push(link.path)
+    pub fn unwritable_paths(&self, state: &State) -> Vec<&Path> {
+        let mut paths = Vec::new();
+        for path in self.links.keys() {
+            if !state.is_writable(path) {
+                paths.push(path.as_path())
             }
         }
-        unwrittable_paths
+        paths
     }
 
-    pub fn is_enabled(&self, default_method: LinkMethod) -> Result<bool> {
-        Ok(self
-            .links(default_method)
-            .all(|link| link.is_enabled().is_ok_and(|enabled| enabled)))
+    pub fn add_sources(&self, config: &Config, state: &mut State) -> Result<()> {
+        for source in self.links.values() {
+            let name = &source.name;
+            let source = config.source(name)?;
+            state.add_source(name, source)?;
+        }
+        Ok(())
     }
 
-    pub fn enable(&self, default_method: LinkMethod, state: &mut State) -> Result<()> {
+    pub fn enable(&self, default_method: LinkMethod, state: &mut State) {
         for link in self.links(default_method) {
-            if state.check(link.path) {
-                match link.enable() {
-                    Ok(()) => state.add_file(link.path, link.method)?,
-                    Err(error) => {
-                        self.disable(default_method, state)?;
-                        bail!(error);
+            if let Err(error) = utils::remove_all(link.path) {
+                error!("{error}");
+            }
+
+            match link.enable() {
+                Ok(()) => {
+                    if let Err(error) = state.add_file(link.path, link.method) {
+                        error!("{error:?}");
                     }
                 }
+                Err(error) => error!("{error:?}"),
             }
         }
-        Ok(())
     }
 
-    pub fn disable(&self, default_method: LinkMethod, state: &mut State) -> Result<()> {
-        for link in self.links(default_method) {
-            if state.check(link.path) {
-                if let Ok(()) = link.disable() {
-                    state.remove_file(link.path);
+    pub fn disable(&self, state: &mut State) {
+        for path in self.links.keys() {
+            if !path.exists() {
+                warn!("File doesn't exist: {}", path.display());
+                continue;
+            }
+
+            if state.is_writable(path) {
+                match utils::remove_all(path) {
+                    Ok(()) => {
+                        info!("Removed file: {}", path.display());
+                        state.remove_file(path)
+                    }
+                    Err(error) => error!("{error:?}"),
                 }
             }
         }
-        Ok(())
     }
 }
 

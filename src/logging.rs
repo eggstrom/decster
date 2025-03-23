@@ -24,4 +24,5 @@ fn level(level: Level) -> StyledContent<&'static str> {
         Level::Debug => "debug:".blue(),
         Level::Trace => "trace:".cyan(),
     }
+    .bold()
 }

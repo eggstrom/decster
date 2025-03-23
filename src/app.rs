@@ -1,10 +1,13 @@
+use std::collections::HashSet;
+
 use anyhow::Result;
 use crossterm::style::Stylize;
-use log::info;
+use log::{error, info};
 
 use crate::{
     cli::{Behavior, Cli, Command, InfoArgs},
     config::Config,
+    module::ModuleFilter,
     state::State,
 };
 
@@ -25,9 +28,9 @@ impl App {
 
         match cli.command {
             Command::Info(args) => app.info(args)?,
-            Command::Enable { modules } => app.enable(modules)?,
-            Command::Disable { modules } => app.disable(modules)?,
-            Command::Update { modules } => app.update(modules),
+            Command::Enable { modules } => app.enable(modules.into_iter().collect())?,
+            Command::Disable { modules } => app.disable(modules.into_iter().collect())?,
+            Command::Update { modules } => app.update(modules.into_iter().collect()),
         }
         Ok(())
     }
@@ -45,31 +48,37 @@ impl App {
         Ok(())
     }
 
-    fn enable(&mut self, modules: Vec<String>) -> Result<()> {
-        for name in modules.iter() {
-            for link in self.config.links(&name)? {
-                let name = link.source_name();
-                let source = self.config.source(name)?;
-                self.state.add_source(name, source)?;
+    fn enable(&mut self, modules: HashSet<String>) -> Result<()> {
+        for (name, module) in self.config.modules(modules, ModuleFilter::All) {
+            let unwritable_paths = module.unwritable_paths(&self.state);
+            if !unwritable_paths.is_empty() {
+                error!(
+                    "Can't enable {} because the following paths aren't writable:",
+                    name.magenta()
+                );
+                for path in unwritable_paths {
+                    println!("  {}", path.display());
+                }
+                continue;
             }
-        }
 
-        for module in modules.iter().map(|s| s.as_str()) {
-            info!("Enabling module: {}", module.magenta());
-            self.config
-                .module(module)?
-                .enable(self.config.link_method, &mut self.state)?;
+            info!("Adding sources for {}", name.magenta());
+            match module.add_sources(&self.config, &mut self.state) {
+                Ok(()) => {
+                    info!("Enabling {}", name.magenta());
+                    module.enable(self.config.link_method, &mut self.state);
+                }
+                Err(error) => error!("{error:?}"),
+            }
         }
         self.state.save()?;
         Ok(())
     }
 
-    fn disable(&mut self, modules: Vec<String>) -> Result<()> {
-        for module in modules.iter().map(|s| s.as_str()) {
-            info!("Disabling module: {}", module.magenta());
-            self.config
-                .module(module)?
-                .disable(self.config.link_method, &mut self.state)?;
+    fn disable(&mut self, modules: HashSet<String>) -> Result<()> {
+        for (name, module) in self.config.modules(modules, ModuleFilter::All) {
+            info!("Disabling {}", name.magenta());
+            module.disable(&mut self.state);
         }
         self.state.save()?;
         Ok(())
