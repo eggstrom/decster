@@ -9,26 +9,33 @@ use crate::{
 pub struct App {
     behavior: Behavior,
     config: Config,
+    state: State,
 }
 
 impl App {
     pub fn run(cli: Cli) -> Result<()> {
         let config = Config::parse(cli.config.as_deref())?;
-        let app = App {
+        let mut app = App {
             behavior: cli.behavior,
             config,
+            state: State::load()?,
         };
 
         match cli.command {
             Command::Info(args) => app.info(args)?,
             Command::Enable { modules } => app.enable(modules)?,
-            Command::Disable { modules } => app.disable(modules),
+            Command::Disable { modules } => app.disable(modules)?,
             Command::Update { modules } => app.update(modules),
         }
         Ok(())
     }
 
     fn info(self, args: InfoArgs) -> Result<()> {
+        if args.owned_files {
+            println!("{}", self.state);
+            return Ok(());
+        }
+
         let (names, filter) = args.modules();
         for (name, module) in self.config.modules(names, filter) {
             todo!()
@@ -36,10 +43,8 @@ impl App {
         Ok(())
     }
 
-    fn enable(self, modules: Vec<String>) -> Result<()> {
-        let state = State::load()?;
-
-        let builder = state.source_builder()?;
+    fn enable(&mut self, modules: Vec<String>) -> Result<()> {
+        let builder = self.state.source_builder()?;
         for module in modules.iter() {
             for link in self.config.links(&module)? {
                 let name = link.source_name();
@@ -52,13 +57,20 @@ impl App {
         for module in modules.iter() {
             self.config
                 .module(module)?
-                .enable(self.config.link_method)?;
+                .enable(self.config.link_method, &mut self.state)?;
         }
+        self.state.save()?;
         Ok(())
     }
 
-    fn disable(self, modules: Vec<String>) {
-        todo!()
+    fn disable(&mut self, modules: Vec<String>) -> Result<()> {
+        for module in modules.iter() {
+            self.config
+                .module(module)?
+                .disable(self.config.link_method, &mut self.state)?;
+        }
+        self.state.save()?;
+        Ok(())
     }
 
     fn update(self, modules: Vec<String>) {

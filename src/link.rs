@@ -101,17 +101,8 @@ impl<'a> Link<'a> {
     }
 
     pub fn disable(&self) -> Result<()> {
-        match self.method {
-            LinkMethod::SoftLink => self.disable_soft_link(),
-            _ => self.disable_file(),
-        }
-    }
-
-    fn disable_file(&self) -> Result<()> {
-        Ok(())
-    }
-
-    fn disable_soft_link(&self) -> Result<()> {
+        utils::remove_all(self.path)?;
+        utils::remove_dir_components(self.path);
         Ok(())
     }
 }

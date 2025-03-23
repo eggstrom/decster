@@ -57,8 +57,11 @@ pub struct InfoArgs {
     #[arg(long, short = 'E', conflicts_with = "disabled")]
     pub enabled: bool,
     /// Only show disabled modules
-    #[arg(long, short = 'D', conflicts_with = "enabled")]
+    #[arg(long, short = 'D')]
     pub disabled: bool,
+    /// Show owned files
+    #[arg(long, short)]
+    pub owned_files: bool,
 }
 
 impl InfoArgs {

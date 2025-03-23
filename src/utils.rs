@@ -6,10 +6,7 @@ use std::{
 };
 
 use anyhow::Result;
-use sha2::{
-    Digest, Sha256,
-    digest::{consts::U32, generic_array::GenericArray},
-};
+use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 
 pub fn dirs_match<P, Q>(lhs: P, rhs: Q) -> Result<bool>
@@ -71,7 +68,6 @@ where
 }
 
 pub type Sha256Hash = [u8; 32];
-pub type DisplayableSha256Hash = GenericArray<u8, U32>;
 
 /// Creates a SHA-256 hash from a file's contents.
 pub fn hash_file<P>(path: P) -> Result<Sha256Hash>

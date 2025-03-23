@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    fmt::{self, Display, Formatter},
     fs::{self, File},
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
@@ -10,6 +11,7 @@ use bincode::{Decode, Encode, config::Configuration};
 use tempfile::TempDir;
 
 use crate::{
+    link::LinkMethod,
     paths,
     source::Source,
     utils::{self, Sha256Hash},
@@ -17,7 +19,7 @@ use crate::{
 
 #[derive(Decode, Default, Encode)]
 pub struct State {
-    owned_files: HashMap<PathBuf, OwnedFile>,
+    owned_files: HashMap<PathBuf, FileInfo>,
 }
 
 impl State {
@@ -38,20 +40,42 @@ impl State {
         bincode::config::standard()
     }
 
-    /// Checks whether `path` can be written to due to being empty or owned by
-    /// the program.
+    /// Checks whether `path` can be written to due to not existing, being
+    /// an empty directory, or being owned by the program.
     pub fn check<P>(&self, path: P) -> bool
     where
         P: AsRef<Path>,
     {
         let path = path.as_ref();
-        self.owned_files
-            .get(path)
-            .is_some_and(|file| file.check(path))
+        path.metadata()
+            .is_ok_and(|metadata| !metadata.permissions().readonly())
+            || (!path.exists())
+            || (path.read_dir().is_ok_and(|mut dir| dir.next().is_none()))
+            || self
+                .owned_files
+                .get(path)
+                .map(|file| file.check(path))
+                .is_some_and(|owned| owned)
     }
 
-    pub fn add_file(&mut self, path: PathBuf, file: OwnedFile) {
+    pub fn add_file<P>(&mut self, path: P, method: LinkMethod) -> Result<()>
+    where
+        P: Into<PathBuf>,
+    {
+        let path = path.into();
+        let file = match method {
+            LinkMethod::Copy | LinkMethod::HardLink => FileInfo::file_at(&path)?,
+            LinkMethod::SoftLink => FileInfo::link_at(&path)?,
+        };
         self.owned_files.insert(path, file);
+        Ok(())
+    }
+
+    pub fn remove_file<P>(&mut self, path: P)
+    where
+        P: AsRef<Path>,
+    {
+        self.owned_files.remove(path.as_ref());
     }
 
     pub fn source_builder(&self) -> Result<SourceBuilder> {
@@ -61,42 +85,56 @@ impl State {
     }
 }
 
-#[derive(Decode, Encode)]
-enum OwnedFile {
-    Copy { size: u64, hash: Sha256Hash },
-    HardLink { size: u64, hash: Sha256Hash },
-    SoftLink { path: PathBuf },
+impl Display for State {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        for path in self.owned_files.keys() {
+            writeln!(f, "{}", path.display())?;
+        }
+        Ok(())
+    }
 }
 
-impl OwnedFile {
-    pub fn new_file(size: u64, hash: Sha256Hash) -> Self {
-        OwnedFile::Copy { size, hash }
+#[derive(Decode, Encode)]
+enum FileInfo {
+    File { size: u64, hash: Sha256Hash },
+    Link { path: PathBuf },
+}
+
+impl FileInfo {
+    pub fn file_at<P>(path: P) -> Result<Self>
+    where
+        P: AsRef<Path>,
+    {
+        let path = path.as_ref();
+        Ok(FileInfo::File {
+            size: path.metadata()?.size(),
+            hash: utils::hash_file(path)?,
+        })
     }
 
-    pub fn new_hard_link(size: u64, hash: Sha256Hash) -> Self {
-        OwnedFile::HardLink { size, hash }
+    pub fn link_at<P>(path: P) -> Result<Self>
+    where
+        P: AsRef<Path>,
+    {
+        let path = path.as_ref();
+        Ok(FileInfo::Link {
+            path: path.read_link()?,
+        })
     }
 
-    pub fn new_soft_link(link_path: PathBuf) -> Self {
-        OwnedFile::SoftLink { path: link_path }
-    }
-
-    /// Checks whether `path` has no contents or if it's contents are
-    /// accurately described by `self`.
+    /// Checks whether the contents of `path` match `self`.
     pub fn check<P>(&self, path: P) -> bool
     where
         P: AsRef<Path>,
     {
         let path = path.as_ref();
         match self {
-            OwnedFile::Copy { size, hash } | OwnedFile::HardLink { size, hash } => {
+            FileInfo::File { size, hash } => {
                 path.metadata()
                     .is_ok_and(|metadata| metadata.size() == *size)
                     && utils::hash_file(path).is_ok_and(|hash2| hash2 == *hash)
             }
-            OwnedFile::SoftLink { path: link_path } => {
-                path.read_link().is_ok_and(|path| path == *link_path)
-            }
+            FileInfo::Link { path } => path.read_link().is_ok_and(|path2| path2 == *path),
         }
     }
 }

@@ -1,7 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    fs,
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use anyhow::{Result, bail};
@@ -10,7 +9,7 @@ use serde::Deserialize;
 use crate::{
     link::{Link, LinkMethod},
     source::SourcePath,
-    utils,
+    state::State,
 };
 
 #[derive(Debug, Deserialize)]
@@ -29,33 +28,44 @@ impl Module {
         })
     }
 
+    pub fn unwrittable_paths(&self, default_method: LinkMethod, state: &mut State) -> Vec<&Path> {
+        let mut unwrittable_paths = Vec::new();
+        for link in self.links(default_method) {
+            if state.check(link.path) {
+                unwrittable_paths.push(link.path)
+            }
+        }
+        unwrittable_paths
+    }
+
     pub fn is_enabled(&self, default_method: LinkMethod) -> Result<bool> {
         Ok(self
             .links(default_method)
             .all(|link| link.is_enabled().is_ok_and(|enabled| enabled)))
     }
 
-    pub fn enable(&self, default_method: LinkMethod) -> Result<()> {
-        let mut created_files = Vec::new();
-
+    pub fn enable(&self, default_method: LinkMethod, state: &mut State) -> Result<()> {
         for link in self.links(default_method) {
-            match link.enable() {
-                Ok(()) => created_files.push(link.path.to_path_buf()),
-                Err(error) => {
-                    for path in created_files.iter() {
-                        utils::remove_all(path)?;
-                        utils::remove_dir_components(path);
+            if state.check(link.path) {
+                match link.enable() {
+                    Ok(()) => state.add_file(link.path, link.method)?,
+                    Err(error) => {
+                        self.disable(default_method, state)?;
+                        bail!(error);
                     }
-                    bail!(error);
                 }
             }
         }
         Ok(())
     }
 
-    pub fn disable(&self, default_method: LinkMethod) -> Result<()> {
+    pub fn disable(&self, default_method: LinkMethod, state: &mut State) -> Result<()> {
         for link in self.links(default_method) {
-            link.disable()?;
+            if state.check(link.path) {
+                if let Ok(()) = link.disable() {
+                    state.remove_file(link.path);
+                }
+            }
         }
         Ok(())
     }
