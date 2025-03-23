@@ -1,71 +1,12 @@
 use std::{
     fs::{self, File},
     io,
-    os::unix::fs::MetadataExt,
     path::Path,
 };
 
 use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
-
-pub fn dirs_match<P, Q>(lhs: P, rhs: Q) -> Result<bool>
-where
-    P: AsRef<Path>,
-    Q: AsRef<Path>,
-{
-    let (lhs, rhs) = (lhs.as_ref(), rhs.as_ref());
-    Ok(lhs.is_dir() && rhs.is_dir())
-}
-
-pub fn files_match<P, Q>(lhs: P, rhs: Q) -> Result<bool>
-where
-    P: AsRef<Path>,
-    Q: AsRef<Path>,
-{
-    let (lhs, rhs) = (lhs.as_ref(), rhs.as_ref());
-    Ok(lhs.metadata()?.size() == rhs.metadata()?.size()
-        || fs::read_to_string(lhs)? == fs::read_to_string(rhs)?)
-}
-
-pub fn hard_links_match<P, Q>(lhs: P, rhs: Q) -> Result<bool>
-where
-    P: AsRef<Path>,
-    Q: AsRef<Path>,
-{
-    let (lhs, rhs) = (lhs.as_ref(), rhs.as_ref());
-    Ok(lhs.metadata()?.ino() == rhs.metadata()?.ino())
-}
-
-pub fn soft_links_match<P, Q>(lhs: P, rhs: Q) -> Result<bool>
-where
-    P: AsRef<Path>,
-    Q: AsRef<Path>,
-{
-    let (lhs, rhs) = (lhs.as_ref(), rhs.as_ref());
-    Ok(lhs.is_symlink() && rhs.is_symlink() && lhs.read_link()? == rhs.read_link()?)
-}
-
-/// Recursively checks whether two paths have the same files.
-pub fn all_match<P, Q>(lhs: P, rhs: Q) -> Result<bool>
-where
-    P: AsRef<Path>,
-    Q: AsRef<Path>,
-{
-    for (lhs, rhs) in WalkDir::new(lhs)
-        .sort_by_file_name()
-        .into_iter()
-        .zip(WalkDir::new(rhs).sort_by_file_name())
-    {
-        let (lhs, rhs) = (lhs?.into_path(), rhs?.into_path());
-        let (lhs, rhs) = (lhs.as_path(), rhs.as_path());
-        return Ok(dirs_match(lhs, rhs)?
-            || files_match(lhs, rhs)?
-            || hard_links_match(lhs, rhs)?
-            || soft_links_match(lhs, rhs)?);
-    }
-    Ok(true)
-}
 
 pub type Sha256Hash = [u8; 32];
 
