@@ -5,7 +5,7 @@ use std::{
     path::Path,
 };
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use log::info;
 use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
@@ -75,8 +75,13 @@ pub fn hash_file<P>(path: P) -> Result<Sha256Hash>
 where
     P: AsRef<Path>,
 {
+    let path = path.as_ref();
+
+    let mut file =
+        File::open(path).with_context(|| format!("Couldn't open file: {}", path.display()))?;
     let mut hasher = Sha256::new();
-    io::copy(&mut File::open(path)?, &mut hasher)?;
+    io::copy(&mut file, &mut hasher)
+        .with_context(|| format!("Couldn't hash file: {}", path.display()))?;
     Ok(hasher.finalize().into())
 }
 
@@ -88,13 +93,13 @@ where
 {
     let (from, to) = (from.as_ref(), to.as_ref());
     info!(
-        "Recursively copying `{}` to `{}`",
+        "Recursively copying: {} -> {}",
         from.display(),
         to.display()
     );
 
     if !from.is_dir() {
-        fs::copy(from, to)?;
+        fs::copy(from, to).with_context(|| "Couldn't copy file: {from} -> {to}")?;
         return Ok(());
     }
 
@@ -102,13 +107,18 @@ where
         match path {
             Ok(path) => {
                 let path = path.path();
-                let relative_path = path.strip_prefix(from)?;
+                let relative_path = path
+                    .strip_prefix(from)
+                    .expect("Couldn't strip prefix while recursively copying");
                 let to = to.join(relative_path);
 
                 if path.is_dir() {
-                    fs::create_dir(&to)?;
+                    fs::create_dir(&to)
+                        .with_context(|| format!("Couldn't create directory: {}", to.display()))?;
                 } else {
-                    fs::copy(path, &to)?;
+                    fs::copy(path, &to).with_context(|| {
+                        format!("Couldn't copy file: {} -> {}", from.display(), to.display())
+                    })?;
                 }
             }
             Err(error) => Err(error)?,
@@ -138,12 +148,13 @@ where
     P: AsRef<Path>,
 {
     let path = path.as_ref();
-    if path.exists() {
-        if !path.is_dir() {
-            fs::remove_file(path)?;
-        } else {
-            fs::remove_dir_all(path)?;
-        }
+    if path.is_dir() {
+        fs::remove_dir_all(path).with_context(|| {
+            format!("Couldn't recursively delete directory: {}", path.display())
+        })?;
+    } else {
+        fs::remove_file(path)
+            .with_context(|| format!("Couldn't remove file: {}", path.display()))?;
     }
     Ok(())
 }

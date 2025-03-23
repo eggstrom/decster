@@ -1,4 +1,5 @@
 use anyhow::Result;
+use crossterm::style::Stylize;
 use log::info;
 
 use crate::{
@@ -45,20 +46,16 @@ impl App {
     }
 
     fn enable(&mut self, modules: Vec<String>) -> Result<()> {
-        info!("Enabling modules: {:?}", modules);
-
-        let builder = self.state.source_builder()?;
-        for module in modules.iter() {
-            for link in self.config.links(&module)? {
+        for name in modules.iter() {
+            for link in self.config.links(&name)? {
                 let name = link.source_name();
                 let source = self.config.source(name)?;
-                builder.add_source(name, source)?;
+                self.state.add_source(name, source)?;
             }
         }
-        builder.save()?;
 
-        for module in modules.iter() {
-            info!("Enabling module `{module}`");
+        for module in modules.iter().map(|s| s.as_str()) {
+            info!("Enabling module: {}", module.magenta());
             self.config
                 .module(module)?
                 .enable(self.config.link_method, &mut self.state)?;
@@ -68,8 +65,8 @@ impl App {
     }
 
     fn disable(&mut self, modules: Vec<String>) -> Result<()> {
-        for module in modules.iter() {
-            info!("Disabling module `{module}`");
+        for module in modules.iter().map(|s| s.as_str()) {
+            info!("Disabling module: {}", module.magenta());
             self.config
                 .module(module)?
                 .disable(self.config.link_method, &mut self.state)?;

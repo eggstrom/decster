@@ -115,8 +115,8 @@ struct SourcePathVisitor;
 impl Visitor<'_> for SourcePathVisitor {
     type Value = SourcePath;
 
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        "a source name followed by an optional path".fmt(formatter)
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        "a source name followed by an optional path".fmt(f)
     }
 
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>

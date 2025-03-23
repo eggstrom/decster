@@ -6,10 +6,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use bincode::{Decode, Encode, config::Configuration};
+use crossterm::style::Stylize;
 use log::info;
-use tempfile::TempDir;
 
 use crate::{
     link::LinkMethod,
@@ -79,10 +79,32 @@ impl State {
         self.owned_files.remove(path.as_ref());
     }
 
-    pub fn source_builder(&self) -> Result<SourceBuilder> {
-        Ok(SourceBuilder {
-            dir: TempDir::new()?,
-        })
+    pub fn add_source(&self, name: &str, source: &Source) -> Result<()> {
+        match source {
+            Source::Text(text) => self.add_text_source(name, text),
+            Source::Path(path) => self.add_path_source(name, path),
+        }
+        .with_context(|| format!("Couldn't add source: {}", name.magenta()))
+    }
+
+    fn add_text_source(&self, name: &str, text: &str) -> Result<()> {
+        let source_path = paths::sources()?.join(name);
+        info!("Adding text source: {}", name.magenta());
+        fs::write(&source_path, text)
+            .with_context(|| format!("Couldn't write to file: {}", source_path.display()))?;
+        Ok(())
+    }
+
+    fn add_path_source<P>(&self, name: &str, path: P) -> Result<()>
+    where
+        P: AsRef<Path>,
+    {
+        let path = path.as_ref();
+        info!("Adding path source: {}", name.magenta());
+
+        let source_path = paths::sources()?.join(name);
+        utils::copy_all(path, &source_path)?;
+        Ok(())
     }
 }
 
@@ -137,44 +159,5 @@ impl FileInfo {
             }
             FileInfo::Link { path } => path.read_link().is_ok_and(|path2| path2 == *path),
         }
-    }
-}
-
-pub struct SourceBuilder {
-    dir: TempDir,
-}
-
-impl SourceBuilder {
-    pub fn save(self) -> Result<()> {
-        let path = paths::sources()?;
-        utils::remove_all(&path)?;
-        fs::create_dir_all(&path)?;
-        fs::rename(self.dir.path(), &path)?;
-        Ok(())
-    }
-
-    pub fn add_source(&self, name: &str, source: &Source) -> Result<()> {
-        Ok(match source {
-            Source::Text(text) => self.add_text_source(name, text)?,
-            Source::Path(path) => self.add_path_source(name, path)?,
-        })
-    }
-
-    fn add_text_source(&self, name: &str, text: &str) -> Result<()> {
-        let path = self.dir.path().join(name);
-        info!("Adding source: {} (text)", name);
-        fs::write(path, text)?;
-        Ok(())
-    }
-
-    fn add_path_source<P>(&self, name: &str, path: P) -> Result<()>
-    where
-        P: AsRef<Path>,
-    {
-        let path = path.as_ref();
-        info!("Adding source: {} (path: {})", name, path.display());
-
-        utils::copy_all(path, self.dir.path().join(name))?;
-        Ok(())
     }
 }

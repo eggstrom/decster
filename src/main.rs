@@ -19,7 +19,7 @@ mod utils;
 fn main() {
     logging::enable();
     if let Err(error) = App::run(Cli::parse()) {
-        error!("{error}");
+        error!("{error:?}");
         process::exit(1);
     }
 }

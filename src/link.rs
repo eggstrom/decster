@@ -77,14 +77,15 @@ impl<'a> Link<'a> {
 
     pub fn enable(&self) -> Result<()> {
         if let Some(dirs) = self.path.parent() {
-            fs::create_dir_all(dirs)?;
+            fs::create_dir_all(dirs)
+                .with_context(|| format!("Couldn't create path for link: {}", dirs.display()))?;
         }
         match self.method {
             LinkMethod::Copy => self.enable_copy(),
             LinkMethod::HardLink => self.enable_hard_link(),
             LinkMethod::SoftLink => self.enable_soft_link(),
         }
-        .with_context(|| anyhow!("couldn't create link: {self}"))
+        .with_context(|| anyhow!("Couldn't create link: {self}"))
     }
 
     fn enable_copy(&self) -> Result<()> {

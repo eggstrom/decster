@@ -17,26 +17,28 @@ static STATE: LazyLock<Option<PathBuf>> =
 
 pub fn home<'a>() -> Result<&'a Path> {
     HOME.as_deref()
-        .ok_or(anyhow!("couldn't find home directory"))
+        .ok_or(anyhow!("Couldn't determine path of home directory"))
 }
 
 pub fn config<'a>() -> Result<&'a Path> {
     CONFIG
         .as_deref()
-        .ok_or(anyhow!("couldn't find config directory"))
+        .ok_or(anyhow!("Couldn't determine path of config directory"))
 }
 
 pub fn data<'a>() -> Result<&'a Path> {
     DATA.as_deref()
-        .ok_or(anyhow!("couldn't find data directory"))
+        .ok_or(anyhow!("Couldn't determine path of data directory"))
 }
 
 pub fn sources<'a>() -> Result<&'a Path> {
     SOURCES
         .as_deref()
-        .ok_or(anyhow!("couldn't find source directory"))
+        .ok_or(anyhow!("Couldn't determine path of source directory"))
 }
 
 pub fn state<'a>() -> Result<&'a Path> {
-    STATE.as_deref().ok_or(anyhow!("couldn't find state file"))
+    STATE
+        .as_deref()
+        .ok_or(anyhow!("Couldn't determine path of state file"))
 }

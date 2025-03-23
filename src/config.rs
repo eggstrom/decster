@@ -5,6 +5,7 @@ use std::{
 };
 
 use anyhow::{Result, anyhow};
+use crossterm::style::Stylize;
 use log::info;
 use serde::Deserialize;
 
@@ -36,13 +37,13 @@ impl Config {
     pub fn source(&self, name: &str) -> Result<&Source> {
         self.sources
             .get(name)
-            .ok_or(anyhow!("source `{name}` is not defined"))
+            .ok_or(anyhow!("Coudln't find source: {}", name.magenta()))
     }
 
     pub fn module(&self, name: &str) -> Result<&Module> {
         self.modules
             .get(name)
-            .ok_or(anyhow!("module `{name}` is not defined"))
+            .ok_or(anyhow!("Couldn't find module: {}", name.magenta()))
     }
 
     pub fn modules(
@@ -68,6 +69,6 @@ impl Config {
         self.modules
             .get(module)
             .map(|module| module.links(self.link_method))
-            .ok_or(anyhow!("module `{module}` is not defined"))
+            .ok_or(anyhow!("Couldn't find module: {}", module.magenta()))
     }
 }
