@@ -2,7 +2,6 @@ use std::collections::HashSet;
 
 use anyhow::Result;
 use crossterm::style::Stylize;
-use log::{error, info};
 
 use crate::{
     cli::{Behavior, Cli, Command, InfoArgs},
@@ -16,7 +15,6 @@ pub struct App {
     config: Config,
     state: State,
 }
-
 impl App {
     pub fn run(cli: Cli) -> Result<()> {
         let config = Config::parse(cli.config.as_deref())?;
@@ -36,11 +34,6 @@ impl App {
     }
 
     fn info(self, args: InfoArgs) -> Result<()> {
-        if args.owned_files {
-            println!("{}", self.state);
-            return Ok(());
-        }
-
         let (names, filter) = args.modules();
         for (name, module) in self.config.modules(names, filter) {
             todo!()
@@ -50,24 +43,28 @@ impl App {
 
     fn enable(&mut self, modules: HashSet<String>) -> Result<()> {
         for (name, module) in self.config.modules(modules, ModuleFilter::All) {
-            info!("Adding sources for {}", name.magenta());
-            match module.add_sources(&self.config, &mut self.state) {
-                Ok(()) => {
-                    info!("Enabling {}", name.magenta());
-                    module.enable(&mut self.state, name, self.config.link_method);
-                }
-                Err(error) => error!("{error:?}"),
+            if self.state.is_module_enabled(name) {
+                println!("Module {} is already enabled", name.magenta());
+                continue;
             }
+
+            println!("Adding sources for module {}", name.magenta());
+            module.add_sources(&self.config, &mut self.state)?;
+            println!("Enabling module {}", name.magenta());
+            module.enable(&mut self.state, name, self.config.link_method)?;
         }
         self.state.save()?;
         Ok(())
     }
 
     fn disable(&mut self, modules: Vec<String>) -> Result<()> {
-        for name in modules.iter() {
-            if let Err(error) = self.state.remove_module(name) {
-                error!("{error:?}");
+        for name in modules.iter().map(|string| string.as_str()) {
+            if !self.state.is_module_enabled(name) {
+                println!("Module {} isn't enabled", name.magenta());
+                continue;
             }
+            println!("Disabling module {}", name.magenta());
+            self.state.remove_module(name)?;
         }
         self.state.save()?;
         Ok(())

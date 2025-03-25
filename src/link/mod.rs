@@ -1,14 +1,13 @@
 use std::{
     borrow::Cow,
     fmt::{self, Display, Formatter},
-    fs,
+    fs, io,
     os::unix,
     path::Path,
 };
 
 use anyhow::Result;
 use crossterm::style::Stylize;
-use log::error;
 use method::LinkMethod;
 
 use crate::{
@@ -49,17 +48,20 @@ impl<'a> Link<'a> {
             };
 
             match state.owner(&new_path) {
-                Some(module) => error!(
-                    "Couldn't create {} as it's already owned by {}",
+                Some(module) => println!(
+                    "{} {} (Path is owned by {})",
+                    "Failed:".red(),
                     new_path.pretty(),
                     module.magenta()
                 ),
                 None => {
-                    if let Err(err) = match path.is_dir() {
+                    if let Err(error) = match path.is_dir() {
                         true => self.create_dir(state, &new_path),
                         false => self.create_file(state, path, &new_path),
                     } {
-                        error!("Couldn't create {} ({err})", new_path.pretty())
+                        println!("{} {} ({error})", "Failed:".red(), new_path.pretty())
+                    } else {
+                        println!("  {} {}", "Created:".green(), path.pretty());
                     }
                 }
             }
@@ -67,36 +69,38 @@ impl<'a> Link<'a> {
         Ok(())
     }
 
-    fn create_dir(&self, state: &mut State, path: &Path) -> Result<()> {
-        fs::create_dir(path)?;
-        state.add_dir(&self.module, path);
-        Ok(())
-    }
-
-    fn create_file(&self, state: &mut State, from: &Path, to: &Path) -> Result<()> {
-        match self.method {
-            LinkMethod::Copy => self.create_copy(state, from, to)?,
-            LinkMethod::HardLink => self.create_hard_link(state, from, to)?,
-            LinkMethod::SoftLink => self.create_soft_link(state, from, to)?,
+    fn create_dir(&self, state: &mut State, path: &Path) -> io::Result<()> {
+        if !path.is_dir() {
+            fs::create_dir(path)?;
+            state.add_dir(&self.module, path);
         }
         Ok(())
     }
 
-    fn create_copy(&self, state: &mut State, from: &Path, to: &Path) -> Result<()> {
+    fn create_file(&self, state: &mut State, source: &Path, destination: &Path) -> io::Result<()> {
+        match self.method {
+            LinkMethod::Copy => self.create_copy(state, source, destination)?,
+            LinkMethod::HardLink => self.create_hard_link(state, source, destination)?,
+            LinkMethod::SoftLink => self.create_soft_link(state, source, destination)?,
+        }
+        Ok(())
+    }
+
+    fn create_copy(&self, state: &mut State, from: &Path, to: &Path) -> io::Result<()> {
         fs::copy(from, to)?;
-        state.add_file(&self.module, to)?;
+        state.add_file(&self.module, to);
         Ok(())
     }
 
-    fn create_hard_link(&self, state: &mut State, from: &Path, to: &Path) -> Result<()> {
-        fs::hard_link(from, to)?;
-        state.add_file(&self.module, to)?;
+    fn create_hard_link(&self, state: &mut State, original: &Path, link: &Path) -> io::Result<()> {
+        fs::hard_link(original, link)?;
+        state.add_file(&self.module, link);
         Ok(())
     }
 
-    fn create_soft_link(&self, state: &mut State, from: &Path, to: &Path) -> Result<()> {
-        unix::fs::symlink(from, to)?;
-        state.add_link(&self.module, to)?;
+    fn create_soft_link(&self, state: &mut State, original: &Path, link: &Path) -> io::Result<()> {
+        unix::fs::symlink(original, link)?;
+        state.add_link(&self.module, original, link);
         Ok(())
     }
 }

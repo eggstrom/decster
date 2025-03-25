@@ -102,18 +102,16 @@ where
 }
 
 /// Recursively removes `path` if it exists.
-pub fn remove_all<P>(path: P) -> Result<()>
+pub fn remove_all<P>(path: P) -> io::Result<()>
 where
     P: AsRef<Path>,
 {
     let path = path.as_ref();
     if path.exists() {
         if path.is_dir() {
-            fs::remove_dir_all(path)
-                .with_context(|| format!("Couldn't remove directory: {}", path.pretty()))?;
+            fs::remove_dir_all(path)?;
         } else {
-            fs::remove_file(path)
-                .with_context(|| format!("Couldn't remove file: {}", path.pretty()))?;
+            fs::remove_file(path)?;
         }
     }
     Ok(())
@@ -122,16 +120,13 @@ where
 pub type Sha256Hash = [u8; 32];
 
 /// Creates a SHA-256 hash from a file's contents.
-pub fn hash_file<P>(path: P) -> Result<Sha256Hash>
+pub fn hash_file<P>(path: P) -> io::Result<Sha256Hash>
 where
     P: AsRef<Path>,
 {
     let path = path.as_ref();
-
-    let mut file =
-        File::open(path).with_context(|| format!("Couldn't open file: {}", path.pretty()))?;
+    let mut file = File::open(path)?;
     let mut hasher = Sha256::new();
-    io::copy(&mut file, &mut hasher)
-        .with_context(|| format!("Couldn't hash file: {}", path.pretty()))?;
+    io::copy(&mut file, &mut hasher)?;
     Ok(hasher.finalize().into())
 }

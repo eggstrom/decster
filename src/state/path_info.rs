@@ -4,8 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result};
-use log::{info, warn};
+use crossterm::style::Stylize;
 use serde::{Deserialize, Serialize};
 
 use crate::utils::{self, fs::Sha256Hash, output::Pretty};
@@ -23,30 +22,22 @@ impl PathInfo {
         PathInfo::Directory
     }
 
-    pub fn new_link<P>(path: P) -> Result<Self>
-    where
-        P: AsRef<Path>,
-    {
-        let path = path.as_ref();
-        Ok(PathInfo::Link {
-            path: path
-                .read_link()
-                .with_context(|| format!("Couldn't read symlink: {}", path.pretty()))?,
-        })
-    }
-
-    pub fn new_file<P>(path: P) -> Result<Self>
+    pub fn new_file<P>(path: P) -> io::Result<Self>
     where
         P: AsRef<Path>,
     {
         let path = path.as_ref();
         Ok(PathInfo::File {
-            size: path
-                .symlink_metadata()
-                .with_context(|| format!("Couldn't read file metadata: {}", path.pretty()))?
-                .size(),
+            size: path.symlink_metadata()?.size(),
             hash: utils::fs::hash_file(path)?,
         })
+    }
+
+    pub fn new_link<P>(path: P) -> Self
+    where
+        P: Into<PathBuf>,
+    {
+        PathInfo::Link { path: path.into() }
     }
 
     fn is_dir_and<F>(&self, f: F) -> bool
@@ -92,7 +83,7 @@ impl PathInfo {
             }) {
                 PathState::OwnedFile
             } else if self.is_link_and(|link_path| path.read_link().is_ok_and(|p| p == link_path)) {
-                PathState::OwnedLink
+                PathState::OwnedSoftLink
             } else {
                 PathState::Changed
             }
@@ -111,12 +102,12 @@ impl PathInfo {
             PathState::OwnedDirectory => {
                 let _ = fs::remove_dir(path);
             }
-            PathState::OwnedFile | PathState::OwnedLink => {
+            PathState::OwnedFile | PathState::OwnedSoftLink => {
                 fs::remove_file(path)?;
-                info!("Removed link: {}", path.pretty());
+                println!("{} {}", "  Removed:".green(), path.pretty());
             }
-            PathState::Changed => warn!("Link has changed: {}", path.pretty()),
-            PathState::Missing => warn!("Link is missing: {}", path.pretty()),
+            PathState::Changed => println!("{} {}", "  Changed:".yellow(), path.pretty()),
+            PathState::Missing => println!("{} {}", "  Missing:".yellow(), path.pretty()),
         }
         Ok(())
     }
@@ -125,7 +116,7 @@ impl PathInfo {
 pub enum PathState {
     OwnedDirectory,
     OwnedFile,
-    OwnedLink,
+    OwnedSoftLink,
     Changed,
     Missing,
 }

@@ -4,7 +4,6 @@ use std::{
 };
 
 use anyhow::Result;
-use log::error;
 use serde::Deserialize;
 
 use crate::{
@@ -48,12 +47,11 @@ impl Module {
         Ok(())
     }
 
-    pub fn enable(&self, state: &mut State, name: &str, default_method: LinkMethod) {
+    pub fn enable(&self, state: &mut State, name: &str, default_method: LinkMethod) -> Result<()> {
         for link in self.links(name, default_method) {
-            if let Err(error) = link.enable(state) {
-                error!("Couldn't enable link ({error:?})")
-            }
+            link.enable(state)?;
         }
+        Ok(())
     }
 }
 

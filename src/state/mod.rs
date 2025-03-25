@@ -8,7 +8,6 @@ use std::{
 
 use anyhow::{Context, Result, anyhow};
 use crossterm::style::Stylize;
-use log::{error, info};
 use path_info::PathInfo;
 use serde::{Deserialize, Serialize};
 
@@ -68,20 +67,25 @@ impl State {
         self.add(module, path, PathInfo::new_dir());
     }
 
-    pub fn add_file(&mut self, module: &str, path: &Path) -> Result<()> {
-        self.add(module, path, PathInfo::new_file(path)?);
-        Ok(())
+    pub fn add_file(&mut self, module: &str, path: &Path) {
+        match PathInfo::new_file(path) {
+            Ok(info) => self.add(module, path, info),
+            Err(error) => println!("{} Couldn't add file to state ({error})", "Error:".red()),
+        }
     }
 
-    pub fn add_link(&mut self, module: &str, path: &Path) -> Result<()> {
-        self.add(module, path, PathInfo::new_link(path)?);
-        Ok(())
+    pub fn add_link(&mut self, module: &str, original: &Path, link: &Path) {
+        self.add(module, link, PathInfo::new_link(original));
+    }
+
+    pub fn is_module_enabled(&self, name: &str) -> bool {
+        self.module_paths.get(name).is_some()
     }
 
     pub fn remove_module(&mut self, name: &str) -> Result<()> {
         // Any paths that can't be removed will be put back into the state.
         // This is a VecDeque because they need to be insrted in reverse order.
-        let mut remaining_paths = VecDeque::new();
+        let mut unremovable_paths = VecDeque::new();
 
         // Paths are removed in reverse order to make sure directories are
         // removed last.
@@ -94,16 +98,16 @@ impl State {
         {
             if let Some((_, path_info)) = self.path_info.get(&path) {
                 if let Err(error) = path_info.remove_if_owned(&path) {
-                    error!("Couldn't remove link: {} ({error})", path.pretty());
-                    remaining_paths.push_front(path);
+                    println!("{} {} ({error})", "Failed:".red(), path.pretty());
+                    unremovable_paths.push_front(path);
                 } else {
                     self.path_info.remove(&path);
                 }
             }
         }
-        if !remaining_paths.is_empty() {
+        if !unremovable_paths.is_empty() {
             self.module_paths
-                .insert(Rc::from(name), remaining_paths.into());
+                .insert(Rc::from(name), unremovable_paths.into());
         }
         Ok(())
     }
@@ -117,7 +121,7 @@ impl State {
     }
 
     fn add_text_source(&self, name: &SourceName, text: &str) -> Result<()> {
-        info!("Adding text source: {}", name.magenta());
+        println!("{} {} (text)", "  Added:".green(), name.magenta());
 
         let source_path = paths::sources()?.join(name);
         fs::write(&source_path, text)
@@ -130,7 +134,7 @@ impl State {
         P: AsRef<Path>,
     {
         let path = path.as_ref();
-        info!("Adding path source: {}", name.magenta());
+        println!("{} {} (path)", "  Added:".green(), name.magenta());
 
         let source_path = paths::sources()?.join(name);
         utils::fs::remove_all(&source_path)?;

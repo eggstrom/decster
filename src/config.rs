@@ -35,7 +35,11 @@ impl Config {
     pub fn source(&self, name: &SourceName) -> Result<&Source> {
         self.sources
             .get(name)
-            .ok_or(anyhow!("Coudln't find source: {}", name.magenta()))
+            .ok_or(anyhow!("Couldn't find source: {}", name.magenta()))
+    }
+
+    pub fn is_module_defined(&self, name: &str) -> bool {
+        self.modules.get(name).is_some()
     }
 
     pub fn modules(

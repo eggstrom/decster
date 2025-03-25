@@ -64,7 +64,7 @@ struct SourcePathVisitor;
 impl Visitor<'_> for SourcePathVisitor {
     type Value = SourcePath;
 
-    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn expecting(&self, f: &mut Formatter) -> fmt::Result {
         "a source name followed by an optional path".fmt(f)
     }
 
