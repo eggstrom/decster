@@ -50,18 +50,6 @@ impl App {
 
     fn enable(&mut self, modules: HashSet<String>) -> Result<()> {
         for (name, module) in self.config.modules(modules, ModuleFilter::All) {
-            let unwritable_paths = module.unwritable_paths(&self.state);
-            if !unwritable_paths.is_empty() {
-                error!(
-                    "Can't enable {} because the following paths aren't writable:",
-                    name.magenta()
-                );
-                for path in unwritable_paths {
-                    println!("  {}", path.display());
-                }
-                continue;
-            }
-
             info!("Adding sources for {}", name.magenta());
             match module.add_sources(&self.config, &mut self.state) {
                 Ok(()) => {

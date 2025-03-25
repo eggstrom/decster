@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
 use anyhow::Result;
@@ -37,16 +37,6 @@ impl Module {
                 self.link_method.unwrap_or(default_method),
             )
         })
-    }
-
-    pub fn unwritable_paths(&self, state: &State) -> Vec<&Path> {
-        let mut paths = Vec::new();
-        for path in self.links.keys() {
-            if !state.is_writable(path) {
-                paths.push(path.as_path())
-            }
-        }
-        paths
     }
 
     pub fn add_sources(&self, config: &Config, state: &mut State) -> Result<()> {

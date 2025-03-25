@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     fmt::{self, Display, Formatter},
     fs,
     path::Path,
@@ -8,7 +8,7 @@ use std::{
 
 use anyhow::{Context, Result, anyhow};
 use crossterm::style::Stylize;
-use log::info;
+use log::{error, info};
 use path_info::PathInfo;
 use serde::{Deserialize, Serialize};
 
@@ -54,29 +54,6 @@ impl State {
         self.path_info.get(path).map(|(module, _)| module.as_ref())
     }
 
-    /// Checks whether `path` is owned and if it's contents match what they're
-    /// expected to have.
-    fn is_owned<P>(&self, path: P) -> bool
-    where
-        P: AsRef<Path>,
-    {
-        let path = path.as_ref();
-        self.path_info
-            .get(path)
-            .map(|(_, info)| info.matches(path))
-            .is_some_and(|owned| owned)
-    }
-
-    pub fn is_writable<P>(&self, path: P) -> bool
-    where
-        P: AsRef<Path>,
-    {
-        let path = path.as_ref();
-        (!path.exists())
-            || (path.read_dir().is_ok_and(|mut dir| dir.next().is_none()))
-            || self.is_owned(path)
-    }
-
     fn add(&mut self, module: &str, path: &Path, info: PathInfo) {
         let module = Rc::from(module);
         let path = Rc::from(path);
@@ -88,7 +65,7 @@ impl State {
     }
 
     pub fn add_dir(&mut self, module: &str, path: &Path) {
-        self.add(module, path, PathInfo::Directory);
+        self.add(module, path, PathInfo::new_dir());
     }
 
     pub fn add_file(&mut self, module: &str, path: &Path) -> Result<()> {
@@ -102,6 +79,10 @@ impl State {
     }
 
     pub fn remove_module(&mut self, name: &str) -> Result<()> {
+        // Any paths that can't be removed will be put back into the state.
+        // This is a VecDeque because they need to be insrted in reverse order.
+        let mut remaining_paths = VecDeque::new();
+
         // Paths are removed in reverse order to make sure directories are
         // removed last.
         for path in self
@@ -111,12 +92,17 @@ impl State {
             .into_iter()
             .rev()
         {
-            if let Some((_, path_info)) = self.path_info.remove(&path) {
-                path_info
-                    .remove_if_matches(&path)
-                    .with_context(|| format!("Couldn't remove: {}", path.display()))?;
+            if let Some((_, path_info)) = self.path_info.get(&path) {
+                if let Err(error) = path_info.remove_if_owned(&path) {
+                    error!("Couldn't remove link: {} ({error})", path.display());
+                    remaining_paths.push_front(path);
+                } else {
+                    self.path_info.remove(&path);
+                }
             }
         }
+        self.module_paths
+            .insert(Rc::from(name), remaining_paths.into());
         Ok(())
     }
 
