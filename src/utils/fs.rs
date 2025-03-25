@@ -8,6 +8,8 @@ use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 
+use super::output::Pretty;
+
 /// Call `f` on every path in a directory.
 ///
 /// `contents_first` determines whether the directory or it's contents are
@@ -55,9 +57,8 @@ where
     let (from, to) = (from.as_ref(), to.as_ref());
 
     if !from.is_dir() {
-        fs::copy(from, to).with_context(|| {
-            format!("Couldn't copy file: {} -> {}", from.display(), to.display())
-        })?;
+        fs::copy(from, to)
+            .with_context(|| format!("Couldn't copy file: {} -> {}", from.pretty(), to.pretty()))?;
         return Ok(());
     }
 
@@ -72,10 +73,10 @@ where
 
                 if path.is_dir() {
                     fs::create_dir(&to)
-                        .with_context(|| format!("Couldn't create directory: {}", to.display()))?;
+                        .with_context(|| format!("Couldn't create directory: {}", to.pretty()))?;
                 } else {
                     fs::copy(path, &to).with_context(|| {
-                        format!("Couldn't copy file: {} -> {}", from.display(), to.display())
+                        format!("Couldn't copy file: {} -> {}", from.pretty(), to.pretty())
                     })?;
                 }
             }
@@ -109,10 +110,10 @@ where
     if path.exists() {
         if path.is_dir() {
             fs::remove_dir_all(path)
-                .with_context(|| format!("Couldn't remove directory: {}", path.display()))?;
+                .with_context(|| format!("Couldn't remove directory: {}", path.pretty()))?;
         } else {
             fs::remove_file(path)
-                .with_context(|| format!("Couldn't remove file: {}", path.display()))?;
+                .with_context(|| format!("Couldn't remove file: {}", path.pretty()))?;
         }
     }
     Ok(())
@@ -128,9 +129,9 @@ where
     let path = path.as_ref();
 
     let mut file =
-        File::open(path).with_context(|| format!("Couldn't open file: {}", path.display()))?;
+        File::open(path).with_context(|| format!("Couldn't open file: {}", path.pretty()))?;
     let mut hasher = Sha256::new();
     io::copy(&mut file, &mut hasher)
-        .with_context(|| format!("Couldn't hash file: {}", path.display()))?;
+        .with_context(|| format!("Couldn't hash file: {}", path.pretty()))?;
     Ok(hasher.finalize().into())
 }

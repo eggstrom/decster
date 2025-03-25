@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     paths,
     source::{Source, name::SourceName},
-    utils,
+    utils::{self, output::Pretty},
 };
 
 pub mod path_info;
@@ -30,7 +30,7 @@ impl State {
     pub fn load() -> Result<Self> {
         let source_path = paths::sources()?;
         fs::create_dir_all(paths::sources()?)
-            .with_context(|| format!("Couldn't create path: {}", source_path.display()))?;
+            .with_context(|| format!("Couldn't create path: {}", source_path.pretty()))?;
 
         Ok(fs::read_to_string(paths::state()?)
             .ok()
@@ -41,7 +41,7 @@ impl State {
     pub fn save(&self) -> Result<()> {
         let path = paths::state()?;
         fs::write(path, toml::to_string(self)?)
-            .with_context(|| format!("Couldn't write to file: {}", path.display()))?;
+            .with_context(|| format!("Couldn't write to file: {}", path.pretty()))?;
         Ok(())
     }
 
@@ -94,15 +94,17 @@ impl State {
         {
             if let Some((_, path_info)) = self.path_info.get(&path) {
                 if let Err(error) = path_info.remove_if_owned(&path) {
-                    error!("Couldn't remove link: {} ({error})", path.display());
+                    error!("Couldn't remove link: {} ({error})", path.pretty());
                     remaining_paths.push_front(path);
                 } else {
                     self.path_info.remove(&path);
                 }
             }
         }
-        self.module_paths
-            .insert(Rc::from(name), remaining_paths.into());
+        if !remaining_paths.is_empty() {
+            self.module_paths
+                .insert(Rc::from(name), remaining_paths.into());
+        }
         Ok(())
     }
 
@@ -119,7 +121,7 @@ impl State {
 
         let source_path = paths::sources()?.join(name);
         fs::write(&source_path, text)
-            .with_context(|| format!("Couldn't write to file: {}", source_path.display()))?;
+            .with_context(|| format!("Couldn't write to file: {}", source_path.pretty()))?;
         Ok(())
     }
 
@@ -131,8 +133,8 @@ impl State {
         info!("Adding path source: {}", name.magenta());
 
         let source_path = paths::sources()?.join(name);
-        utils::remove_all(&source_path)?;
-        utils::copy_all(path, &source_path)?;
+        utils::fs::remove_all(&source_path)?;
+        utils::fs::copy_all(path, &source_path)?;
         Ok(())
     }
 }
@@ -142,7 +144,7 @@ impl Display for State {
         for (module, paths) in self.module_paths.iter() {
             writeln!(f, "{}", module.magenta())?;
             for path in paths.iter() {
-                writeln!(f, "  {}", path.display())?;
+                writeln!(f, "  {}", path.pretty())?;
             }
         }
         Ok(())

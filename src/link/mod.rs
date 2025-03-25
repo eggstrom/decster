@@ -11,7 +11,11 @@ use crossterm::style::Stylize;
 use log::error;
 use method::LinkMethod;
 
-use crate::{source::path::SourcePath, state::State, utils};
+use crate::{
+    source::path::SourcePath,
+    state::State,
+    utils::{self, output::Pretty},
+};
 
 pub mod method;
 
@@ -38,7 +42,7 @@ impl<'a> Link<'a> {
     }
 
     pub fn enable(&self, state: &mut State) -> Result<()> {
-        utils::walk_dir_with_rel(self.source.path()?, false, |path, rel_path| {
+        utils::fs::walk_dir_with_rel(self.source.path()?, false, |path, rel_path| {
             let new_path = match rel_path.parent() {
                 None => Cow::Borrowed(self.path),
                 Some(_) => Cow::Owned(self.path.join(rel_path)),
@@ -47,7 +51,7 @@ impl<'a> Link<'a> {
             match state.owner(&new_path) {
                 Some(module) => error!(
                     "Couldn't create {} as it's already owned by {}",
-                    new_path.display(),
+                    new_path.pretty(),
                     module.magenta()
                 ),
                 None => {
@@ -55,7 +59,7 @@ impl<'a> Link<'a> {
                         true => self.create_dir(state, &new_path),
                         false => self.create_file(state, path, &new_path),
                     } {
-                        error!("Couldn't create {} ({err})", new_path.display())
+                        error!("Couldn't create {} ({err})", new_path.pretty())
                     }
                 }
             }
@@ -102,7 +106,7 @@ impl Display for Link<'_> {
         write!(
             f,
             "{} {} {} {}",
-            self.path.display(),
+            self.path.pretty(),
             "->".with(self.method.color()),
             self.source,
             self.method

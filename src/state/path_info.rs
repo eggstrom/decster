@@ -1,6 +1,5 @@
 use std::{
-    fs::{self},
-    io,
+    fs, io,
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
 };
@@ -9,7 +8,7 @@ use anyhow::{Context, Result};
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
 
-use crate::utils::{self, Sha256Hash};
+use crate::utils::{self, fs::Sha256Hash, output::Pretty};
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -32,7 +31,7 @@ impl PathInfo {
         Ok(PathInfo::Link {
             path: path
                 .read_link()
-                .with_context(|| format!("Couldn't read symlink: {}", path.display()))?,
+                .with_context(|| format!("Couldn't read symlink: {}", path.pretty()))?,
         })
     }
 
@@ -44,9 +43,9 @@ impl PathInfo {
         Ok(PathInfo::File {
             size: path
                 .symlink_metadata()
-                .with_context(|| format!("Couldn't read file metadata: {}", path.display()))?
+                .with_context(|| format!("Couldn't read file metadata: {}", path.pretty()))?
                 .size(),
-            hash: utils::hash_file(path)?,
+            hash: utils::fs::hash_file(path)?,
         })
     }
 
@@ -89,7 +88,7 @@ impl PathInfo {
             if self.is_dir_and(|| path.is_dir()) {
                 PathState::OwnedDirectory
             } else if self.is_file_and(|size, hash| {
-                metadata.size() == size && utils::hash_file(path).is_ok_and(|h| h == *hash)
+                metadata.size() == size && utils::fs::hash_file(path).is_ok_and(|h| h == *hash)
             }) {
                 PathState::OwnedFile
             } else if self.is_link_and(|link_path| path.read_link().is_ok_and(|p| p == link_path)) {
@@ -114,10 +113,10 @@ impl PathInfo {
             }
             PathState::OwnedFile | PathState::OwnedLink => {
                 fs::remove_file(path)?;
-                info!("Removed link: {}", path.display());
+                info!("Removed link: {}", path.pretty());
             }
-            PathState::Changed => warn!("Link has changed: {}", path.display()),
-            PathState::Missing => warn!("Link is missing: {}", path.display()),
+            PathState::Changed => warn!("Link has changed: {}", path.pretty()),
+            PathState::Missing => warn!("Link is missing: {}", path.pretty()),
         }
         Ok(())
     }
