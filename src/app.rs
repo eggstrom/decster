@@ -29,8 +29,8 @@ impl App {
         match cli.command {
             Command::Info(args) => app.info(args)?,
             Command::Enable { modules } => app.enable(modules.into_iter().collect())?,
-            Command::Disable { modules } => app.disable(modules.into_iter().collect())?,
-            Command::Update { modules } => app.update(modules.into_iter().collect()),
+            Command::Disable { modules } => app.disable(modules)?,
+            Command::Update { modules } => app.update(modules),
         }
         Ok(())
     }
@@ -66,7 +66,7 @@ impl App {
             match module.add_sources(&self.config, &mut self.state) {
                 Ok(()) => {
                     info!("Enabling {}", name.magenta());
-                    module.enable(self.config.link_method, &mut self.state);
+                    module.enable(&mut self.state, name, self.config.link_method);
                 }
                 Err(error) => error!("{error:?}"),
             }
@@ -75,10 +75,11 @@ impl App {
         Ok(())
     }
 
-    fn disable(&mut self, modules: HashSet<String>) -> Result<()> {
-        for (name, module) in self.config.modules(modules, ModuleFilter::All) {
-            info!("Disabling {}", name.magenta());
-            module.disable(&mut self.state);
+    fn disable(&mut self, modules: Vec<String>) -> Result<()> {
+        for name in modules.iter() {
+            if let Err(error) = self.state.remove_module(name) {
+                error!("{error:?}");
+            }
         }
         self.state.save()?;
         Ok(())

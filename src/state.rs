@@ -1,47 +1,68 @@
 use std::{
     collections::HashMap,
     fmt::{self, Display, Formatter},
-    fs::{self, File},
+    fs,
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
+    rc::Rc,
 };
 
-use anyhow::{Context, Result};
-use bincode::{Decode, Encode, config::Configuration};
+use anyhow::{Context, Result, anyhow};
 use crossterm::style::Stylize;
 use log::info;
+use serde::{Deserialize, Serialize};
 
 use crate::{
-    link::LinkMethod,
     paths,
     source::{Source, SourceName},
     utils::{self, Sha256Hash},
 };
 
-#[derive(Decode, Default, Encode)]
+#[derive(Default, Deserialize, Serialize)]
 pub struct State {
-    owned_files: HashMap<PathBuf, FileInfo>,
+    module_paths: HashMap<Rc<str>, Vec<Rc<Path>>>,
+    path_info: HashMap<Rc<Path>, (Rc<str>, PathInfo)>,
 }
 
 impl State {
     pub fn load() -> Result<Self> {
-        let path = paths::sources()?;
-        fs::create_dir_all(path)
-            .with_context(|| format!("Couldn't create path: {}", path.display()))?;
-        Ok(File::open(paths::state()?)
+        let source_path = paths::sources()?;
+        fs::create_dir_all(paths::sources()?)
+            .with_context(|| format!("Couldn't create path: {}", source_path.display()))?;
+
+        Ok(fs::read_to_string(paths::state()?)
             .ok()
-            .and_then(|mut file| bincode::decode_from_std_read(&mut file, Self::bin_config()).ok())
+            .and_then(|string| toml::from_str(&string).ok())
             .unwrap_or_default())
     }
 
     pub fn save(&self) -> Result<()> {
-        let mut file = File::create(paths::state()?)?;
-        bincode::encode_into_std_write(self, &mut file, Self::bin_config())?;
+        let path = paths::state()?;
+        fs::write(path, toml::to_string(self)?)
+            .with_context(|| format!("Couldn't write to file: {}", path.display()))?;
         Ok(())
     }
 
-    pub fn bin_config() -> Configuration {
-        bincode::config::standard()
+    /// Gets the owner of `path`.
+    pub fn owner<P>(&self, path: P) -> Option<&str>
+    where
+        P: AsRef<Path>,
+    {
+        let path = path.as_ref();
+        self.path_info.get(path).map(|(module, _)| module.as_ref())
+    }
+
+    /// Checks whether `path` is owned and if it's contents match what they're
+    /// expected to have.
+    fn is_owned<P>(&self, path: P) -> bool
+    where
+        P: AsRef<Path>,
+    {
+        let path = path.as_ref();
+        self.path_info
+            .get(path)
+            .map(|(_, info)| info.matches(path))
+            .is_some_and(|owned| owned)
     }
 
     pub fn is_writable<P>(&self, path: P) -> bool
@@ -49,37 +70,52 @@ impl State {
         P: AsRef<Path>,
     {
         let path = path.as_ref();
-        !path.exists()
-            || self
-                .owned_files
-                .get(path)
-                .map(|file| file.check(path))
-                .is_some_and(|owned| owned)
+        (!path.exists())
+            || (path.read_dir().is_ok_and(|mut dir| dir.next().is_none()))
+            || self.is_owned(path)
     }
 
-    pub fn add_file<P>(&mut self, path: P, method: LinkMethod) -> Result<()>
-    where
-        P: AsRef<Path>,
-    {
-        let path = path.as_ref();
-        if path.is_dir() {
-            return Ok(());
-        }
-        self.owned_files.insert(
-            path.to_path_buf(),
-            match method {
-                LinkMethod::SoftLink => FileInfo::new_link(path),
-                _ => FileInfo::new_file(path),
-            }?,
-        );
+    fn add(&mut self, module: &str, path: &Path, info: PathInfo) {
+        let module = Rc::from(module);
+        let path = Rc::from(path);
+        self.module_paths
+            .entry(Rc::clone(&module))
+            .or_insert_with(|| Vec::new())
+            .push(Rc::clone(&path));
+        self.path_info.insert(path, (module, info));
+    }
+
+    pub fn add_dir(&mut self, module: &str, path: &Path) {
+        self.add(module, path, PathInfo::Directory);
+    }
+
+    pub fn add_file(&mut self, module: &str, path: &Path) -> Result<()> {
+        self.add(module, path, PathInfo::new_file(path)?);
         Ok(())
     }
 
-    pub fn remove_file<P>(&mut self, path: P)
-    where
-        P: AsRef<Path>,
-    {
-        self.owned_files.remove(path.as_ref());
+    pub fn add_link(&mut self, module: &str, path: &Path) -> Result<()> {
+        self.add(module, path, PathInfo::new_link(path)?);
+        Ok(())
+    }
+
+    pub fn remove_module(&mut self, name: &str) -> Result<()> {
+        // Paths are removed in reverse order to make sure directories are
+        // removed last.
+        for path in self
+            .module_paths
+            .remove(name)
+            .ok_or(anyhow!("Couldn't find module: {}", name.magenta()))?
+            .into_iter()
+            .rev()
+        {
+            if let Some((_, path_info)) = self.path_info.remove(&path) {
+                path_info
+                    .remove_if_matches(&path)
+                    .with_context(|| format!("Couldn't remove: {}", path.display()))?;
+            }
+        }
+        Ok(())
     }
 
     pub fn add_source(&self, name: &SourceName, source: &Source) -> Result<()> {
@@ -115,26 +151,31 @@ impl State {
 
 impl Display for State {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        for path in self.owned_files.keys() {
-            writeln!(f, "{}", path.display())?;
+        for (module, paths) in self.module_paths.iter() {
+            writeln!(f, "{}", module.magenta())?;
+            for path in paths.iter() {
+                writeln!(f, "  {}", path.display())?;
+            }
         }
         Ok(())
     }
 }
 
-#[derive(Decode, Encode)]
-enum FileInfo {
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+enum PathInfo {
+    Directory,
     File { size: u64, hash: Sha256Hash },
     Link { path: PathBuf },
 }
 
-impl FileInfo {
+impl PathInfo {
     pub fn new_link<P>(path: P) -> Result<Self>
     where
         P: AsRef<Path>,
     {
         let path = path.as_ref();
-        Ok(FileInfo::Link {
+        Ok(PathInfo::Link {
             path: path
                 .read_link()
                 .with_context(|| format!("Couldn't read symlink: {}", path.display()))?,
@@ -146,7 +187,7 @@ impl FileInfo {
         P: AsRef<Path>,
     {
         let path = path.as_ref();
-        Ok(FileInfo::File {
+        Ok(PathInfo::File {
             size: path
                 .metadata()
                 .with_context(|| format!("Couldn't read file metadata: {}", path.display()))?
@@ -156,18 +197,35 @@ impl FileInfo {
     }
 
     /// Checks whether the contents of `path` match `self`.
-    pub fn check<P>(&self, path: P) -> bool
+    pub fn matches<P>(&self, path: P) -> bool
     where
         P: AsRef<Path>,
     {
         let path = path.as_ref();
         match self {
-            FileInfo::File { size, hash } => {
+            PathInfo::Directory => path.is_dir(),
+            PathInfo::File { size, hash } => {
                 path.metadata()
                     .is_ok_and(|metadata| metadata.size() == *size)
                     && utils::hash_file(path).is_ok_and(|hash2| hash2 == *hash)
             }
-            FileInfo::Link { path } => path.read_link().is_ok_and(|path2| path2 == *path),
+            PathInfo::Link { path } => path.read_link().is_ok_and(|path2| path2 == *path),
         }
+    }
+
+    /// Removes `path` if it's contents match `self`.
+    pub fn remove_if_matches<P>(&self, path: P) -> Result<()>
+    where
+        P: AsRef<Path>,
+    {
+        let path = path.as_ref();
+        if self.matches(path) {
+            if path.is_dir() {
+                fs::remove_dir(path)?;
+            } else {
+                fs::remove_file(path)?;
+            }
+        }
+        Ok(())
     }
 }

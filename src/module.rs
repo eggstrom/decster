@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::Result;
-use log::{error, info, warn};
+use log::error;
 use serde::Deserialize;
 
 use crate::{
@@ -25,9 +25,18 @@ pub struct Module {
 }
 
 impl Module {
-    pub fn links(&self, default_method: LinkMethod) -> impl Iterator<Item = Link> {
+    pub fn links<'a>(
+        &'a self,
+        name: &'a str,
+        default_method: LinkMethod,
+    ) -> impl Iterator<Item = Link<'a>> {
         self.links.iter().map(move |(path, source)| {
-            Link::new(path, source, self.link_method.unwrap_or(default_method))
+            Link::new(
+                name,
+                path,
+                source,
+                self.link_method.unwrap_or(default_method),
+            )
         })
     }
 
@@ -50,38 +59,10 @@ impl Module {
         Ok(())
     }
 
-    pub fn enable(&self, default_method: LinkMethod, state: &mut State) {
-        for link in self.links(default_method) {
-            if let Err(error) = utils::remove_all(link.path) {
-                error!("{error}");
-            }
-
-            match link.enable() {
-                Ok(()) => {
-                    if let Err(error) = state.add_file(link.path, link.method) {
-                        error!("{error:?}");
-                    }
-                }
-                Err(error) => error!("{error:?}"),
-            }
-        }
-    }
-
-    pub fn disable(&self, state: &mut State) {
-        for path in self.links.keys() {
-            if !path.exists() {
-                warn!("File doesn't exist: {}", path.display());
-                continue;
-            }
-
-            if state.is_writable(path) {
-                match utils::remove_all(path) {
-                    Ok(()) => {
-                        info!("Removed file: {}", path.display());
-                        state.remove_file(path)
-                    }
-                    Err(error) => error!("{error:?}"),
-                }
+    pub fn enable(&self, state: &mut State, name: &str, default_method: LinkMethod) {
+        for link in self.links(name, default_method) {
+            if let Err(error) = link.enable(state) {
+                error!("Couldn't enable link ({error:?})")
             }
         }
     }

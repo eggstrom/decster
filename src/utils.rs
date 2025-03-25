@@ -1,28 +1,49 @@
 use std::{
     fs::{self, File},
     io,
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 
-pub type Sha256Hash = [u8; 32];
-
-/// Creates a SHA-256 hash from a file's contents.
-pub fn hash_file<P>(path: P) -> Result<Sha256Hash>
+/// Call `f` on every path in a directory.
+///
+/// `contents_first` determines whether the directory or it's contents are
+/// yielded first.
+pub fn walk_dir<P, F>(root: P, contents_first: bool, f: F)
 where
     P: AsRef<Path>,
+    F: FnMut(PathBuf),
 {
-    let path = path.as_ref();
+    let root = root.as_ref();
+    WalkDir::new(root)
+        .follow_root_links(false)
+        .contents_first(contents_first)
+        .into_iter()
+        .filter_map(|res| res.map(|entry| entry.into_path()).ok())
+        .for_each(f);
+}
 
-    let mut file =
-        File::open(path).with_context(|| format!("Couldn't open file: {}", path.display()))?;
-    let mut hasher = Sha256::new();
-    io::copy(&mut file, &mut hasher)
-        .with_context(|| format!("Couldn't hash file: {}", path.display()))?;
-    Ok(hasher.finalize().into())
+/// Call `f` on every path in a directory. `f`'s second argument will be the
+/// relative path.
+///
+/// `contents_first` determines whether the directory or it's contents are
+/// yielded first.
+pub fn walk_dir_with_rel<P, F>(root: P, contents_first: bool, mut f: F)
+where
+    P: AsRef<Path>,
+    F: FnMut(&Path, &Path),
+{
+    let root = root.as_ref();
+    walk_dir(root, contents_first, |path| {
+        f(
+            path.as_path(),
+            path.strip_prefix(root)
+                .expect("paths should always be prefixed with the root while walking a directory"),
+        )
+    });
 }
 
 /// Recursively copies the contents of a directory.
@@ -95,4 +116,21 @@ where
         }
     }
     Ok(())
+}
+
+pub type Sha256Hash = [u8; 32];
+
+/// Creates a SHA-256 hash from a file's contents.
+pub fn hash_file<P>(path: P) -> Result<Sha256Hash>
+where
+    P: AsRef<Path>,
+{
+    let path = path.as_ref();
+
+    let mut file =
+        File::open(path).with_context(|| format!("Couldn't open file: {}", path.display()))?;
+    let mut hasher = Sha256::new();
+    io::copy(&mut file, &mut hasher)
+        .with_context(|| format!("Couldn't hash file: {}", path.display()))?;
+    Ok(hasher.finalize().into())
 }

@@ -13,7 +13,7 @@ static DATA: LazyLock<Option<PathBuf>> =
 static SOURCES: LazyLock<Option<PathBuf>> =
     LazyLock::new(|| DATA.as_deref().map(|path| path.join("sources")));
 static STATE: LazyLock<Option<PathBuf>> =
-    LazyLock::new(|| DATA.as_deref().map(|path| path.join("state")));
+    LazyLock::new(|| DATA.as_deref().map(|path| path.join("state.toml")));
 
 pub fn home<'a>() -> Result<&'a Path> {
     HOME.as_deref()

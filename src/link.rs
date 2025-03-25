@@ -1,13 +1,17 @@
 use std::{
+    borrow::Cow,
     fmt::{self, Display, Formatter},
     fs,
+    os::unix,
     path::Path,
 };
 
-use crate::{source::SourcePath, utils};
-use anyhow::{Context, Result, anyhow};
+use anyhow::Result;
 use crossterm::style::{Color, Stylize};
+use log::{debug, error, info};
 use serde::Deserialize;
+
+use crate::{source::SourcePath, state::State, utils};
 
 #[derive(Clone, Copy, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -41,53 +45,83 @@ impl Display for LinkMethod {
 }
 
 pub struct Link<'a> {
+    pub module: &'a str,
     pub path: &'a Path,
     pub source: &'a SourcePath,
     pub method: LinkMethod,
 }
 
 impl<'a> Link<'a> {
-    pub fn new(path: &'a Path, source: &'a SourcePath, method: LinkMethod) -> Self {
+    pub fn new(
+        module: &'a str,
+        path: &'a Path,
+        source: &'a SourcePath,
+        method: LinkMethod,
+    ) -> Self {
         Link {
+            module,
             path,
             source,
             method,
         }
     }
 
-    pub fn source_name(&self) -> &str {
-        &self.source.name
-    }
+    pub fn enable(&self, state: &mut State) -> Result<()> {
+        utils::walk_dir_with_rel(self.source.path()?, false, |path, rel_path| {
+            let new_path = match rel_path.parent() {
+                None => Cow::Borrowed(self.path),
+                Some(_) => Cow::Owned(self.path.join(rel_path)),
+            };
 
-    pub fn enable(&self) -> Result<()> {
-        if let Some(dirs) = self.path.parent() {
-            fs::create_dir_all(dirs)
-                .with_context(|| format!("Couldn't create path for link: {}", dirs.display()))?;
-        }
-        match self.method {
-            LinkMethod::Copy => self.enable_copy(),
-            LinkMethod::HardLink => self.enable_hard_link(),
-            LinkMethod::SoftLink => self.enable_soft_link(),
-        }
-        .with_context(|| anyhow!("Couldn't create link: {self}"))
-    }
-
-    fn enable_copy(&self) -> Result<()> {
-        utils::copy_all(self.source.path()?, self.path)?;
+            match state.owner(&new_path) {
+                Some(module) => error!(
+                    "Couldn't create {} as it's already owned by {}",
+                    new_path.display(),
+                    module.magenta()
+                ),
+                None => {
+                    if let Err(err) = match path.is_dir() {
+                        true => self.create_dir(state, &new_path),
+                        false => self.create_file(state, path, &new_path),
+                    } {
+                        error!("Couldn't create {} ({err})", new_path.display())
+                    }
+                }
+            }
+        });
         Ok(())
     }
 
-    fn enable_hard_link(&self) -> Result<()> {
-        todo!()
+    fn create_dir(&self, state: &mut State, path: &Path) -> Result<()> {
+        fs::create_dir(path)?;
+        state.add_dir(&self.module, path);
+        Ok(())
     }
 
-    fn enable_soft_link(&self) -> Result<()> {
-        todo!()
+    fn create_file(&self, state: &mut State, from: &Path, to: &Path) -> Result<()> {
+        match self.method {
+            LinkMethod::Copy => self.create_copy(state, from, to)?,
+            LinkMethod::HardLink => self.create_hard_link(state, from, to)?,
+            LinkMethod::SoftLink => self.create_soft_link(state, from, to)?,
+        }
+        Ok(())
     }
 
-    pub fn disable(&self) -> Result<()> {
-        utils::remove_all(self.path)?;
-        utils::remove_dir_components(self.path);
+    fn create_copy(&self, state: &mut State, from: &Path, to: &Path) -> Result<()> {
+        fs::copy(from, to)?;
+        state.add_file(&self.module, to)?;
+        Ok(())
+    }
+
+    fn create_hard_link(&self, state: &mut State, from: &Path, to: &Path) -> Result<()> {
+        fs::hard_link(from, to)?;
+        state.add_file(&self.module, to)?;
+        Ok(())
+    }
+
+    fn create_soft_link(&self, state: &mut State, from: &Path, to: &Path) -> Result<()> {
+        unix::fs::symlink(from, to)?;
+        state.add_link(&self.module, to)?;
         Ok(())
     }
 }
