@@ -9,10 +9,10 @@ use crossterm::style::Stylize;
 use serde::Deserialize;
 
 use crate::{
-    link::LinkMethod,
+    link::method::LinkMethod,
     module::{Module, ModuleFilter},
     paths,
-    source::{Source, SourceName},
+    source::{Source, name::SourceName},
 };
 
 #[derive(Debug, Deserialize)]

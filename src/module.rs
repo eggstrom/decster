@@ -9,10 +9,9 @@ use serde::Deserialize;
 
 use crate::{
     config::Config,
-    link::{Link, LinkMethod},
-    source::SourcePath,
+    link::{Link, method::LinkMethod},
+    source::path::SourcePath,
     state::State,
-    utils,
 };
 
 #[derive(Debug, Deserialize)]
