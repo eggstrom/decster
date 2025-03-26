@@ -25,7 +25,7 @@ pub struct Config {
 
 impl Config {
     pub fn parse(path: Option<&Path>) -> Result<Self> {
-        let path = path.unwrap_or(paths::config()?).join("config.toml");
+        let path = path.unwrap_or(paths::config()).join("config.toml");
         Ok(toml::from_str(&fs::read_to_string(path)?)?)
     }
 

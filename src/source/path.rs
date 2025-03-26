@@ -23,12 +23,12 @@ pub struct SourcePath {
 }
 
 impl SourcePath {
-    pub fn path(&self) -> Result<PathBuf> {
-        let mut full_path = paths::sources()?.join(&self.name);
+    pub fn path(&self) -> PathBuf {
+        let mut full_path = paths::sources().join(&self.name);
         if let Some(path) = &self.path {
             full_path.push(path);
         }
-        Ok(full_path)
+        full_path
     }
 }
 

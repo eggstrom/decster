@@ -1,6 +1,5 @@
 use std::{borrow::Cow, fs, io, os::unix, path::Path};
 
-use anyhow::Result;
 use crossterm::style::Stylize;
 
 use crate::{
@@ -19,11 +18,11 @@ impl<'a> ModuleFile<'a> {
         ModuleFile { path, source }
     }
 
-    fn create_with<F>(&self, state: &mut State, name: &str, mut f: F) -> Result<()>
+    fn create_with<F>(&self, state: &mut State, name: &str, mut f: F)
     where
         F: FnMut(&mut State, &Path, &Path) -> io::Result<()>,
     {
-        utils::fs::walk_dir_with_rel(self.source.path()?, false, |path, rel_path| {
+        utils::fs::walk_dir_with_rel(self.source.path(), false, |path, rel_path| {
             let new_path = match rel_path.parent() {
                 None => Cow::Borrowed(self.path),
                 Some(_) => Cow::Owned(self.path.join(rel_path)),
@@ -48,30 +47,29 @@ impl<'a> ModuleFile<'a> {
                 }
             }
         });
-        Ok(())
     }
 
-    pub fn create_files(&self, state: &mut State, name: &str) -> Result<()> {
+    pub fn create_files(&self, state: &mut State, name: &str) {
         self.create_with(state, name, |state, from, to| {
             fs::copy(from, to)?;
             state.add_file(name, to);
             Ok(())
-        })
+        });
     }
 
-    pub fn create_hard_links(&self, state: &mut State, name: &str) -> Result<()> {
+    pub fn create_hard_links(&self, state: &mut State, name: &str) {
         self.create_with(state, name, |state, original, link| {
             fs::hard_link(original, link)?;
             state.add_hard_link(name, link);
             Ok(())
-        })
+        });
     }
 
-    pub fn create_symlinks(&self, state: &mut State, name: &str) -> Result<()> {
+    pub fn create_symlinks(&self, state: &mut State, name: &str) {
         self.create_with(state, name, |state, original, link| {
             unix::fs::symlink(original, link)?;
             state.add_symlink(name, original, link);
             Ok(())
-        })
+        });
     }
 }

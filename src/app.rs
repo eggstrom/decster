@@ -7,6 +7,7 @@ use crate::{
     cli::{Behavior, Cli, Command, InfoArgs},
     config::Config,
     module::ModuleFilter,
+    paths,
     state::State,
 };
 
@@ -17,6 +18,7 @@ pub struct App {
 }
 impl App {
     pub fn run(cli: Cli) -> Result<()> {
+        paths::init()?;
         let config = Config::parse(cli.config.as_deref())?;
         let mut app = App {
             behavior: cli.behavior,

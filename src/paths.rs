@@ -1,44 +1,72 @@
 use std::{
     path::{Path, PathBuf},
-    sync::LazyLock,
+    sync::OnceLock,
 };
 
 use anyhow::{Result, anyhow};
 
-static HOME: LazyLock<Option<PathBuf>> = LazyLock::new(|| dirs::home_dir());
-static CONFIG: LazyLock<Option<PathBuf>> =
-    LazyLock::new(|| dirs::config_dir().map(|path| path.join("decster")));
-static DATA: LazyLock<Option<PathBuf>> =
-    LazyLock::new(|| dirs::data_dir().map(|path| path.join("decster")));
-static SOURCES: LazyLock<Option<PathBuf>> =
-    LazyLock::new(|| DATA.as_deref().map(|path| path.join("sources")));
-static STATE: LazyLock<Option<PathBuf>> =
-    LazyLock::new(|| DATA.as_deref().map(|path| path.join("state.toml")));
+const APP_NAME: &str = "decster";
 
-pub fn home<'a>() -> Result<&'a Path> {
-    HOME.as_deref()
-        .ok_or(anyhow!("Couldn't determine path of home directory"))
+struct Paths {
+    home: PathBuf,
+    config: PathBuf,
+    data: PathBuf,
+    sources: PathBuf,
+    state: PathBuf,
 }
 
-pub fn config<'a>() -> Result<&'a Path> {
-    CONFIG
-        .as_deref()
-        .ok_or(anyhow!("Couldn't determine path of config directory"))
+impl Paths {
+    pub fn new() -> Result<Self> {
+        let home = dirs::home_dir().ok_or(anyhow!("Couldn't determine path of home directory"))?;
+        let config = dirs::config_dir()
+            .map(|path| path.join(APP_NAME))
+            .ok_or(anyhow!("Couldn't determine path of config directory"))?;
+        let data = dirs::data_dir()
+            .map(|path| path.join(APP_NAME))
+            .ok_or(anyhow!("Couldn't determine path of data directory"))?;
+        let sources = data.join("sources");
+        let state = data.join("state.toml");
+
+        Ok(Paths {
+            home,
+            config,
+            data,
+            sources,
+            state,
+        })
+    }
 }
 
-pub fn data<'a>() -> Result<&'a Path> {
-    DATA.as_deref()
-        .ok_or(anyhow!("Couldn't determine path of data directory"))
+static PATHS: OnceLock<Paths> = OnceLock::new();
+
+pub fn init() -> Result<()> {
+    PATHS
+        .set(Paths::new()?)
+        .ok()
+        .expect("`paths::init` should only be called once");
+    Ok(())
 }
 
-pub fn sources<'a>() -> Result<&'a Path> {
-    SOURCES
-        .as_deref()
-        .ok_or(anyhow!("Couldn't determine path of source directory"))
+fn paths() -> &'static Paths {
+    PATHS.get().expect("`paths::init` should be called and return `Ok` before any other function in `paths` is called")
 }
 
-pub fn state<'a>() -> Result<&'a Path> {
-    STATE
-        .as_deref()
-        .ok_or(anyhow!("Couldn't determine path of state file"))
+pub fn home() -> &'static Path {
+    &paths().home
+}
+
+pub fn config() -> &'static Path {
+    &paths().config
+}
+
+pub fn data() -> &'static Path {
+    &paths().data
+}
+
+pub fn sources() -> &'static Path {
+    &paths().sources
+}
+
+pub fn state() -> &'static Path {
+    &paths().state
 }

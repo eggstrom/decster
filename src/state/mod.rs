@@ -26,18 +26,17 @@ pub struct State {
 
 impl State {
     pub fn load() -> Result<Self> {
-        let source_path = paths::sources()?;
-        fs::create_dir_all(paths::sources()?)
-            .with_context(|| format!("Couldn't create path: {}", source_path.pretty()))?;
+        fs::create_dir_all(paths::sources())
+            .with_context(|| format!("Couldn't create path: {}", paths::sources().pretty()))?;
 
-        Ok(fs::read_to_string(paths::state()?)
+        Ok(fs::read_to_string(paths::state())
             .ok()
             .and_then(|string| toml::from_str(&string).ok())
             .unwrap_or_default())
     }
 
     pub fn save(&self) -> Result<()> {
-        let path = paths::state()?;
+        let path = paths::state();
         fs::write(path, toml::to_string(self)?)
             .with_context(|| format!("Couldn't write to file: {}", path.pretty()))?;
         Ok(())
@@ -139,7 +138,7 @@ impl State {
     fn add_text_source(&self, name: &SourceName, text: &str) -> Result<()> {
         println!("{} {} (text)", "  Added:".green(), name.magenta());
 
-        let source_path = paths::sources()?.join(name);
+        let source_path = paths::sources().join(name);
         fs::write(&source_path, text)
             .with_context(|| format!("Couldn't write to file: {}", source_path.pretty()))?;
         Ok(())
@@ -152,7 +151,7 @@ impl State {
         let path = path.as_ref();
         println!("{} {} (path)", "  Added:".green(), name.magenta());
 
-        let source_path = paths::sources()?.join(name);
+        let source_path = paths::sources().join(name);
         utils::fs::remove_all(&source_path)?;
         utils::fs::copy_all(path, &source_path)?;
         Ok(())

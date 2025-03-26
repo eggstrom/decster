@@ -67,15 +67,15 @@ impl Module {
     pub fn enable(&self, state: &mut State, name: &str) -> Result<()> {
         println!("  Creating files");
         for files in self.files() {
-            files.create_files(state, name)?;
+            files.create_files(state, name);
         }
         println!("  Creating hard links");
         for hard_link in self.hard_links() {
-            hard_link.create_hard_links(state, name)?;
+            hard_link.create_hard_links(state, name);
         }
         println!("  Creating symlinks");
         for symlink in self.symlinks() {
-            symlink.create_symlinks(state, name)?;
+            symlink.create_symlinks(state, name);
         }
         Ok(())
     }
