@@ -1,4 +1,8 @@
-use std::{collections::HashMap, fs, path::Path};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fs,
+    path::Path,
+};
 
 use anyhow::Result;
 use crossterm::style::Stylize;
@@ -17,7 +21,7 @@ pub struct Config {
     #[serde(default)]
     sources: HashMap<SourceName, Source>,
     #[serde(default)]
-    modules: HashMap<String, Module>,
+    modules: BTreeMap<String, Module>,
 }
 
 impl Config {

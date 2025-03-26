@@ -1,12 +1,12 @@
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{BTreeMap, HashMap, VecDeque},
     fs, io, mem,
     path::Path,
     rc::Rc,
 };
 
 use anyhow::{Context, Result};
-use crossterm::style::{Attribute, Stylize};
+use crossterm::style::Stylize;
 use path_info::PathInfo;
 use serde::{Deserialize, Serialize};
 
@@ -20,7 +20,7 @@ pub mod path_info;
 
 #[derive(Default, Deserialize, Serialize)]
 pub struct State {
-    module_paths: HashMap<Rc<str>, Vec<Rc<Path>>>,
+    module_paths: BTreeMap<Rc<str>, Vec<Rc<Path>>>,
     path_info: HashMap<Rc<Path>, (Rc<str>, PathInfo)>,
 }
 

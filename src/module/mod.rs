@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashSet},
     path::PathBuf,
 };
 
@@ -22,11 +22,11 @@ pub struct Module {
     import: HashSet<String>,
 
     #[serde(default)]
-    files: HashMap<PathBuf, SourcePath>,
+    files: BTreeMap<PathBuf, SourcePath>,
     #[serde(default)]
-    hard_links: HashMap<PathBuf, SourcePath>,
+    hard_links: BTreeMap<PathBuf, SourcePath>,
     #[serde(default)]
-    symlinks: HashMap<PathBuf, SourcePath>,
+    symlinks: BTreeMap<PathBuf, SourcePath>,
 }
 
 impl Module {
