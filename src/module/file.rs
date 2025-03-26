@@ -2,7 +2,7 @@ use std::{
     borrow::Cow,
     fs::{self, File},
     io,
-    os::unix,
+    os::unix::{self, fs::MetadataExt},
     path::Path,
 };
 
@@ -58,16 +58,20 @@ impl<'a> ModuleFile<'a> {
 
     pub fn create_files(&self, state: &mut State, name: &str) {
         self.create_with(state, name, |state, from, to| {
+            let size = from.metadata()?.size();
+            let hash = utils::fs::hash_file(from)?;
             io::copy(&mut File::open(from)?, &mut File::create_new(to)?)?;
-            state.add_file(name, to);
+            state.add_file(name, to, size, hash);
             Ok(())
         });
     }
 
-    pub fn create_hard_links(&self, state: &mut State, name: &str) {
-        self.create_with(state, name, |state, original, link| {
+    pub fn create_hard_links(&self, state: &mut State, module: &str) {
+        self.create_with(state, module, |state, original, link| {
+            let size = original.metadata()?.size();
+            let hash = utils::fs::hash_file(original)?;
             fs::hard_link(original, link)?;
-            state.add_hard_link(name, link);
+            state.add_hard_link(module, link, size, hash);
             Ok(())
         });
     }

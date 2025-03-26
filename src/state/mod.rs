@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     paths,
     source::{Source, name::SourceName},
-    utils::{self, output::Pretty},
+    utils::{self, fs::Sha256Hash, output::Pretty},
 };
 
 pub mod path_info;
@@ -88,33 +88,22 @@ impl State {
     pub fn create_dir(&mut self, module: &str, path: &Path) -> io::Result<()> {
         if !path.is_dir() {
             fs::create_dir(path)?;
-            self.add(module, path, PathInfo::new_dir())
+            self.add(module, path, PathInfo::Directory);
         }
         Ok(())
     }
 
-    pub fn add_file(&mut self, module: &str, path: &Path) {
-        match PathInfo::new_file(path) {
-            Ok(info) => self.add(module, path, info),
-            Err(err) => println!(
-                "      {} Couldn't add file to state ({err})",
-                "Error:".red()
-            ),
-        }
+    pub fn add_file(&mut self, module: &str, path: &Path, size: u64, hash: Sha256Hash) {
+        self.add(module, path, PathInfo::File { size, hash });
     }
 
-    pub fn add_hard_link(&mut self, module: &str, link: &Path) {
-        match PathInfo::new_hard_link(link) {
-            Ok(info) => self.add(module, link, info),
-            Err(err) => println!(
-                "      {} Couldn't add hard link to state ({err})",
-                "Error:".red()
-            ),
-        }
+    pub fn add_hard_link(&mut self, module: &str, path: &Path, size: u64, hash: Sha256Hash) {
+        self.add(module, path, PathInfo::HardLink { size, hash });
     }
 
     pub fn add_symlink(&mut self, module: &str, original: &Path, link: &Path) {
-        self.add(module, link, PathInfo::new_symlink(original));
+        let path = original.to_path_buf();
+        self.add(module, link, PathInfo::Symlink { path });
     }
 
     pub fn disable_module(&mut self, module: &str) {

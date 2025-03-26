@@ -19,39 +19,6 @@ pub enum PathInfo {
 }
 
 impl PathInfo {
-    pub fn new_dir() -> Self {
-        PathInfo::Directory
-    }
-
-    pub fn new_file<P>(path: P) -> io::Result<Self>
-    where
-        P: AsRef<Path>,
-    {
-        let path = path.as_ref();
-        Ok(PathInfo::File {
-            size: path.symlink_metadata()?.size(),
-            hash: utils::fs::hash_file(path)?,
-        })
-    }
-
-    pub fn new_hard_link<P>(path: P) -> io::Result<Self>
-    where
-        P: AsRef<Path>,
-    {
-        let path = path.as_ref();
-        Ok(PathInfo::HardLink {
-            size: path.symlink_metadata()?.size(),
-            hash: utils::fs::hash_file(path)?,
-        })
-    }
-
-    pub fn new_symlink<P>(path: P) -> Self
-    where
-        P: Into<PathBuf>,
-    {
-        PathInfo::Symlink { path: path.into() }
-    }
-
     fn is_dir_and<F>(&self, f: F) -> bool
     where
         F: FnOnce() -> bool,
