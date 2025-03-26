@@ -52,7 +52,7 @@ impl App {
 
             println!("Enabling module {}", name.magenta());
             module.add_sources(&self.config, &mut self.state)?;
-            module.create_files(&mut self.state, name)?;
+            module.create_files(&mut self.state, name);
         }
         self.state.save()?;
         Ok(())

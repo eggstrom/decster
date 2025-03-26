@@ -76,8 +76,8 @@ impl State {
     pub fn add_file(&mut self, module: &str, path: &Path) {
         match PathInfo::new_file(path) {
             Ok(info) => self.add(module, path, info),
-            Err(error) => println!(
-                "      {} Couldn't add file to state ({error})",
+            Err(err) => println!(
+                "      {} Couldn't add file to state ({err})",
                 "Error:".red()
             ),
         }
@@ -86,8 +86,8 @@ impl State {
     pub fn add_hard_link(&mut self, module: &str, link: &Path) {
         match PathInfo::new_hard_link(link) {
             Ok(info) => self.add(module, link, info),
-            Err(error) => println!(
-                "      {} Couldn't add hard link to state ({error})",
+            Err(err) => println!(
+                "      {} Couldn't add hard link to state ({err})",
                 "Error:".red()
             ),
         }
@@ -112,8 +112,8 @@ impl State {
             .rev()
         {
             if let Some((_, path_info)) = self.path_info.get(&path) {
-                if let Err(error) = path_info.remove_if_owned(&path) {
-                    println!("{} {} ({error})", "Failed:".red(), path.pretty());
+                if let Err(err) = path_info.remove_if_owned(&path) {
+                    println!("{} {} ({err})", "Failed:".red(), path.pretty());
                     unremovable_paths.push_front(path);
                 } else {
                     self.path_info.remove(&path);
@@ -144,8 +144,7 @@ impl State {
         fs::write(&source_path, text)
     }
 
-    fn add_path_source(&self, source_path: &Path, path: &Path) -> Result<()> {
-        utils::fs::copy_all(path, &source_path)?;
-        Ok(())
+    fn add_path_source(&self, source_path: &Path, path: &Path) -> io::Result<()> {
+        utils::fs::copy_all(path, &source_path)
     }
 }

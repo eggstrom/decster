@@ -4,20 +4,17 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
-
-use super::output::Pretty;
 
 /// Call `f` on every path in a directory.
 ///
 /// `contents_first` determines whether the directory or it's contents are
 /// yielded first.
-pub fn walk_dir<P, F>(root: P, contents_first: bool, f: F)
+pub fn walk_dir<P, F>(root: P, contents_first: bool, f: F) -> io::Result<()>
 where
     P: AsRef<Path>,
-    F: FnMut(PathBuf),
+    F: FnMut(PathBuf) -> io::Result<()>,
 {
     let root = root.as_ref();
     WalkDir::new(root)
@@ -25,7 +22,7 @@ where
         .contents_first(contents_first)
         .into_iter()
         .filter_map(|res| res.map(|entry| entry.into_path()).ok())
-        .for_each(f);
+        .try_for_each(f)
 }
 
 /// Call `f` on every path in a directory. `f`'s second argument will be the
@@ -33,10 +30,10 @@ where
 ///
 /// `contents_first` determines whether the directory or it's contents are
 /// yielded first.
-pub fn walk_dir_with_rel<P, F>(root: P, contents_first: bool, mut f: F)
+pub fn walk_dir_with_rel<P, F>(root: P, contents_first: bool, mut f: F) -> io::Result<()>
 where
     P: AsRef<Path>,
-    F: FnMut(&Path, &Path),
+    F: FnMut(&Path, &Path) -> io::Result<()>,
 {
     let root = root.as_ref();
     walk_dir(root, contents_first, |path| {
@@ -45,45 +42,30 @@ where
             path.strip_prefix(root)
                 .expect("paths should always be prefixed with the root while walking a directory"),
         )
-    });
+    })
 }
 
 /// Recursively copies the contents of a directory.
-pub fn copy_all<P, Q>(from: P, to: Q) -> Result<()>
+pub fn copy_all<P, Q>(from: P, to: Q) -> io::Result<()>
 where
     P: AsRef<Path>,
     Q: AsRef<Path>,
 {
     let (from, to) = (from.as_ref(), to.as_ref());
-
     if !from.is_dir() {
-        fs::copy(from, to)
-            .with_context(|| format!("Couldn't copy file: {} -> {}", from.pretty(), to.pretty()))?;
+        fs::copy(from, to)?;
         return Ok(());
     }
 
-    for path in WalkDir::new(&from) {
-        match path {
-            Ok(path) => {
-                let path = path.path();
-                let relative_path = path
-                    .strip_prefix(from)
-                    .expect("`path` should always start with `from`");
-                let to = to.join(relative_path);
-
-                if path.is_dir() {
-                    fs::create_dir(&to)
-                        .with_context(|| format!("Couldn't create directory: {}", to.pretty()))?;
-                } else {
-                    fs::copy(path, &to).with_context(|| {
-                        format!("Couldn't copy file: {} -> {}", from.pretty(), to.pretty())
-                    })?;
-                }
-            }
-            Err(error) => Err(error)?,
+    walk_dir_with_rel(from, false, |path, rel_path| {
+        let to = to.join(rel_path);
+        if path.is_dir() {
+            fs::create_dir(&to)?;
+        } else {
+            fs::copy(path, &to)?;
         }
-    }
-    Ok(())
+        Ok(())
+    })
 }
 
 /// Removes a directory and all it's parents until it finds a parent that's not

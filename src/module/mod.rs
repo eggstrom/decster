@@ -63,13 +63,13 @@ impl Module {
             let source = config.source(name)?;
             match state.add_source(name, source) {
                 Ok(_) => println!("    {} {name} ({source})", "Added:".green()),
-                Err(error) => println!("    {} {name} ({error})", "Failed:".red()),
+                Err(err) => println!("    {} {name} ({err})", "Failed:".red()),
             }
         }
         Ok(())
     }
 
-    pub fn create_files(&self, state: &mut State, name: &str) -> Result<()> {
+    pub fn create_files(&self, state: &mut State, name: &str) {
         println!("  Creating files");
         for files in self.files() {
             files.create_files(state, name);
@@ -82,7 +82,6 @@ impl Module {
         for symlink in self.symlinks() {
             symlink.create_symlinks(state, name);
         }
-        Ok(())
     }
 }
 

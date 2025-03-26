@@ -15,8 +15,8 @@ mod state;
 mod utils;
 
 fn main() {
-    if let Err(error) = App::run(Cli::parse()) {
-        eprintln!("{} {error:?}", "error:".red());
+    if let Err(err) = App::run(Cli::parse()) {
+        eprintln!("{} {err:?}", "error:".red());
         process::exit(1);
     }
 }

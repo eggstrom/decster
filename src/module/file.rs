@@ -22,7 +22,7 @@ impl<'a> ModuleFile<'a> {
     where
         F: FnMut(&mut State, &Path, &Path) -> io::Result<()>,
     {
-        utils::fs::walk_dir_with_rel(self.source.path(), false, |path, rel_path| {
+        let _ = utils::fs::walk_dir_with_rel(self.source.path(), false, |path, rel_path| {
             let new_path = match rel_path.parent() {
                 None => Cow::Borrowed(self.path),
                 Some(_) => Cow::Owned(self.path.join(rel_path)),
@@ -36,16 +36,17 @@ impl<'a> ModuleFile<'a> {
                     module.magenta()
                 ),
                 None => {
-                    if let Err(error) = match path.is_dir() {
+                    if let Err(err) = match path.is_dir() {
                         true => state.create_dir(name, &new_path),
                         false => f(state, path, &new_path),
                     } {
-                        println!("    {} {} ({error})", "Failed:".red(), new_path.pretty())
+                        println!("    {} {} ({err})", "Failed:".red(), new_path.pretty())
                     } else {
                         println!("    {} {}", "Created:".green(), new_path.pretty());
                     }
                 }
             }
+            Ok(())
         });
     }
 
