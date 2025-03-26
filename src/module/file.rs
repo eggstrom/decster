@@ -1,4 +1,10 @@
-use std::{borrow::Cow, fs, io, os::unix, path::Path};
+use std::{
+    borrow::Cow,
+    fs::{self, File},
+    io,
+    os::unix,
+    path::Path,
+};
 
 use crossterm::style::Stylize;
 
@@ -52,7 +58,7 @@ impl<'a> ModuleFile<'a> {
 
     pub fn create_files(&self, state: &mut State, name: &str) {
         self.create_with(state, name, |state, from, to| {
-            fs::copy(from, to)?;
+            io::copy(&mut File::open(from)?, &mut File::create_new(to)?)?;
             state.add_file(name, to);
             Ok(())
         });

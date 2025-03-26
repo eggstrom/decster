@@ -1,16 +1,14 @@
-use std::{
-    collections::{HashMap, HashSet},
-    fs,
-    path::Path,
-};
+use std::{collections::HashMap, fs, path::Path};
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
+use crossterm::style::Stylize;
 use serde::Deserialize;
 
 use crate::{
-    module::{Module, ModuleFilter},
+    module::Module,
     paths,
     source::{Source, name::SourceName},
+    state::State,
 };
 
 #[derive(Debug, Deserialize)]
@@ -28,25 +26,48 @@ impl Config {
         Ok(toml::from_str(&fs::read_to_string(path)?)?)
     }
 
-    pub fn source(&self, name: &SourceName) -> Result<&Source> {
-        self.sources
-            .get(name)
-            .ok_or(anyhow!("Couldn't find source: {}", name))
+    pub fn source(&self, name: &SourceName) -> Option<&Source> {
+        self.sources.get(name)
     }
 
-    pub fn modules(
-        &self,
-        names: HashSet<String>,
-        filter: ModuleFilter,
-    ) -> impl Iterator<Item = (&str, &Module)> {
-        self.modules.iter().filter_map(move |(name, module)| {
-            ((names.is_empty() || names.contains(name))
-                && match filter {
-                    ModuleFilter::All => true,
-                    ModuleFilter::Enabled => true,
-                    ModuleFilter::Disabled => true,
-                })
-            .then_some((name.as_str(), module))
-        })
+    pub fn module(&self, name: &str) -> Option<&Module> {
+        self.modules.get(name)
+    }
+
+    pub fn modules(&self) -> impl Iterator<Item = (&str, &Module)> {
+        self.modules
+            .iter()
+            .map(|(name, module)| (name.as_str(), module))
+    }
+
+    pub fn enable_module(&self, state: &mut State, name: &str) {
+        if state.is_module_enabled(name) {
+            println!("Module {} is already enabled", name.magenta());
+        } else if let Some(module) = self.module(name) {
+            self.enable_module_inner(state, name, module);
+        } else {
+            println!("Module {} isn't defined", name.magenta());
+        }
+    }
+
+    pub fn enable_all_modules(&self, state: &mut State) {
+        let mut has_enabled = false;
+        for (name, module) in self.modules() {
+            if !state.is_module_enabled(name) {
+                self.enable_module_inner(state, name, module);
+                has_enabled = true;
+            }
+        }
+        if !has_enabled {
+            println!("There are no disabled modules");
+        }
+    }
+
+    fn enable_module_inner(&self, state: &mut State, name: &str, module: &Module) {
+        println!("Enabling module {}", name.magenta());
+        module.add_sources(&self, state);
+        module.create_files(state, name);
+        module.create_hard_links(state, name);
+        module.create_symlinks(state, name);
     }
 }

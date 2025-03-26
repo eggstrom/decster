@@ -134,8 +134,20 @@ impl PathInfo {
                 fs::remove_file(path)?;
                 println!("{} {}", "  Removed:".green(), path.pretty());
             }
-            PathState::Changed => println!("{} {}", "  Changed:".yellow(), path.pretty()),
-            PathState::Missing => println!("{} {}", "  Missing:".yellow(), path.pretty()),
+            PathState::Changed => {
+                println!(
+                    "{} {} (File changed)",
+                    "  Skipping:".yellow(),
+                    path.pretty()
+                )
+            }
+            PathState::Missing => {
+                println!(
+                    "{} {} (File missing)",
+                    "  Skipping:".yellow(),
+                    path.pretty()
+                )
+            }
         }
         Ok(())
     }

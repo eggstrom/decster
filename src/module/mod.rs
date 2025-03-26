@@ -3,7 +3,6 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::Result;
 use crossterm::style::Stylize;
 use file::ModuleFile;
 use serde::Deserialize;
@@ -31,19 +30,19 @@ pub struct Module {
 }
 
 impl Module {
-    fn files(&self) -> impl Iterator<Item = ModuleFile> {
+    fn files(&self) -> impl ExactSizeIterator<Item = ModuleFile> {
         self.files
             .iter()
             .map(|(path, source)| ModuleFile::new(path.as_path(), source))
     }
 
-    fn hard_links(&self) -> impl Iterator<Item = ModuleFile> {
+    fn hard_links(&self) -> impl ExactSizeIterator<Item = ModuleFile> {
         self.hard_links
             .iter()
             .map(|(path, source)| ModuleFile::new(path.as_path(), source))
     }
 
-    fn symlinks(&self) -> impl Iterator<Item = ModuleFile> {
+    fn symlinks(&self) -> impl ExactSizeIterator<Item = ModuleFile> {
         self.symlinks
             .iter()
             .map(|(path, source)| ModuleFile::new(path.as_path(), source))
@@ -57,30 +56,54 @@ impl Module {
             .map(|source| &source.name)
     }
 
-    pub fn add_sources(&self, config: &Config, state: &mut State) -> Result<()> {
-        println!("  Adding sources");
-        for name in self.sources() {
-            let source = config.source(name)?;
-            match state.add_source(name, source) {
-                Ok(_) => println!("    {} {name} ({source})", "Added:".green()),
-                Err(err) => println!("    {} {name} ({err})", "Failed:".red()),
+    pub fn add_sources(&self, config: &Config, state: &mut State) {
+        let sources = self.sources();
+        if sources.size_hint().0 > 0 {
+            println!("  Adding sources");
+            for name in self.sources() {
+                if let Some(source) = config.source(name) {
+                    match state.add_source(name, source) {
+                        Ok(_) => println!("    {} {name} ({source})", "Added:".green()),
+                        Err(err) => println!("    {} {name} ({err})", "Failed:".red()),
+                    }
+                } else {
+                    println!(
+                        "{} {} (Source isn't defined)",
+                        "Failed:".red(),
+                        name.magenta()
+                    );
+                }
             }
         }
-        Ok(())
     }
 
     pub fn create_files(&self, state: &mut State, name: &str) {
-        println!("  Creating files");
-        for files in self.files() {
-            files.create_files(state, name);
+        let files = self.files();
+        if files.len() > 0 {
+            println!("  Creating files");
+            for file in files {
+                file.create_files(state, name);
+            }
         }
-        println!("  Creating hard links");
-        for hard_link in self.hard_links() {
-            hard_link.create_hard_links(state, name);
+    }
+
+    pub fn create_hard_links(&self, state: &mut State, name: &str) {
+        let hard_links = self.hard_links();
+        if hard_links.len() > 0 {
+            println!("  Creating hard links");
+            for hard_link in hard_links {
+                hard_link.create_hard_links(state, name);
+            }
         }
-        println!("  Creating symlinks");
-        for symlink in self.symlinks() {
-            symlink.create_symlinks(state, name);
+    }
+
+    pub fn create_symlinks(&self, state: &mut State, name: &str) {
+        let symlinks = self.symlinks();
+        if symlinks.len() > 0 {
+            println!("  Creating symlinks");
+            for symlink in symlinks {
+                symlink.create_symlinks(state, name);
+            }
         }
     }
 }
