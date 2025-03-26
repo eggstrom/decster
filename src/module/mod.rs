@@ -16,7 +16,7 @@ use crate::{
 pub mod file;
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Module {
     #[serde(default)]
     import: HashSet<String>,

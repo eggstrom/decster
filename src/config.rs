@@ -16,7 +16,7 @@ use crate::{
 };
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Config {
     #[serde(default)]
     sources: HashMap<SourceName, Source>,
