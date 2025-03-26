@@ -51,7 +51,7 @@ impl App {
             println!("Adding sources for module {}", name.magenta());
             module.add_sources(&self.config, &mut self.state)?;
             println!("Enabling module {}", name.magenta());
-            module.enable(&mut self.state, name, self.config.link_method)?;
+            module.enable(&mut self.state, name)?;
         }
         self.state.save()?;
         Ok(())

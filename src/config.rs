@@ -9,7 +9,6 @@ use crossterm::style::Stylize;
 use serde::Deserialize;
 
 use crate::{
-    link::method::LinkMethod,
     module::{Module, ModuleFilter},
     paths,
     source::{Source, name::SourceName},
@@ -18,8 +17,6 @@ use crate::{
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
-    #[serde(default)]
-    pub link_method: LinkMethod,
     #[serde(default)]
     sources: HashMap<SourceName, Source>,
     #[serde(default)]
@@ -36,10 +33,6 @@ impl Config {
         self.sources
             .get(name)
             .ok_or(anyhow!("Couldn't find source: {}", name.magenta()))
-    }
-
-    pub fn is_module_defined(&self, name: &str) -> bool {
-        self.modules.get(name).is_some()
     }
 
     pub fn modules(

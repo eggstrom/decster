@@ -14,7 +14,8 @@ use crate::utils::{self, fs::Sha256Hash, output::Pretty};
 pub enum PathInfo {
     Directory,
     File { size: u64, hash: Sha256Hash },
-    Link { path: PathBuf },
+    HardLink { size: u64, hash: Sha256Hash },
+    Symlink { path: PathBuf },
 }
 
 impl PathInfo {
@@ -33,11 +34,22 @@ impl PathInfo {
         })
     }
 
-    pub fn new_link<P>(path: P) -> Self
+    pub fn new_hard_link<P>(path: P) -> io::Result<Self>
+    where
+        P: AsRef<Path>,
+    {
+        let path = path.as_ref();
+        Ok(PathInfo::HardLink {
+            size: path.symlink_metadata()?.size(),
+            hash: utils::fs::hash_file(path)?,
+        })
+    }
+
+    pub fn new_symlink<P>(path: P) -> Self
     where
         P: Into<PathBuf>,
     {
-        PathInfo::Link { path: path.into() }
+        PathInfo::Symlink { path: path.into() }
     }
 
     fn is_dir_and<F>(&self, f: F) -> bool
@@ -60,12 +72,22 @@ impl PathInfo {
         }
     }
 
-    fn is_link_and<F>(&self, f: F) -> bool
+    fn is_hard_link_and<F>(&self, f: F) -> bool
+    where
+        F: FnOnce(u64, &Sha256Hash) -> bool,
+    {
+        match self {
+            PathInfo::HardLink { size, hash } => f(*size, hash),
+            _ => false,
+        }
+    }
+
+    fn is_symlink_and<F>(&self, f: F) -> bool
     where
         F: FnOnce(&Path) -> bool,
     {
         match self {
-            PathInfo::Link { path } => f(&path),
+            PathInfo::Symlink { path } => f(&path),
             _ => false,
         }
     }
@@ -82,8 +104,14 @@ impl PathInfo {
                 metadata.size() == size && utils::fs::hash_file(path).is_ok_and(|h| h == *hash)
             }) {
                 PathState::OwnedFile
-            } else if self.is_link_and(|link_path| path.read_link().is_ok_and(|p| p == link_path)) {
-                PathState::OwnedSoftLink
+            } else if self.is_hard_link_and(|size, hash| {
+                metadata.size() == size && utils::fs::hash_file(path).is_ok_and(|h| h == *hash)
+            }) {
+                PathState::OwnedHardLink
+            } else if self
+                .is_symlink_and(|link_path| path.read_link().is_ok_and(|p| p == link_path))
+            {
+                PathState::OwnedSymlink
             } else {
                 PathState::Changed
             }
@@ -102,7 +130,7 @@ impl PathInfo {
             PathState::OwnedDirectory => {
                 let _ = fs::remove_dir(path);
             }
-            PathState::OwnedFile | PathState::OwnedSoftLink => {
+            PathState::OwnedFile | PathState::OwnedHardLink | PathState::OwnedSymlink => {
                 fs::remove_file(path)?;
                 println!("{} {}", "  Removed:".green(), path.pretty());
             }
@@ -116,7 +144,8 @@ impl PathInfo {
 pub enum PathState {
     OwnedDirectory,
     OwnedFile,
-    OwnedSoftLink,
+    OwnedHardLink,
+    OwnedSymlink,
     Changed,
     Missing,
 }

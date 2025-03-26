@@ -1,7 +1,6 @@
 use std::{
     collections::{HashMap, VecDeque},
-    fmt::{self, Display, Formatter},
-    fs,
+    fs, io,
     path::Path,
     rc::Rc,
 };
@@ -44,6 +43,10 @@ impl State {
         Ok(())
     }
 
+    pub fn is_module_enabled(&self, name: &str) -> bool {
+        self.module_paths.get(name).is_some()
+    }
+
     /// Gets the owner of `path`.
     pub fn owner<P>(&self, path: P) -> Option<&str>
     where
@@ -63,23 +66,36 @@ impl State {
         self.path_info.insert(path, (module, info));
     }
 
-    pub fn add_dir(&mut self, module: &str, path: &Path) {
-        self.add(module, path, PathInfo::new_dir());
+    pub fn create_dir(&mut self, module: &str, path: &Path) -> io::Result<()> {
+        if !path.is_dir() {
+            fs::create_dir(path)?;
+            self.add(module, path, PathInfo::new_dir())
+        }
+        Ok(())
     }
 
     pub fn add_file(&mut self, module: &str, path: &Path) {
         match PathInfo::new_file(path) {
             Ok(info) => self.add(module, path, info),
-            Err(error) => println!("{} Couldn't add file to state ({error})", "Error:".red()),
+            Err(error) => println!(
+                "      {} Couldn't add file to state ({error})",
+                "Error:".red()
+            ),
         }
     }
 
-    pub fn add_link(&mut self, module: &str, original: &Path, link: &Path) {
-        self.add(module, link, PathInfo::new_link(original));
+    pub fn add_hard_link(&mut self, module: &str, link: &Path) {
+        match PathInfo::new_hard_link(link) {
+            Ok(info) => self.add(module, link, info),
+            Err(error) => println!(
+                "      {} Couldn't add hard link to state ({error})",
+                "Error:".red()
+            ),
+        }
     }
 
-    pub fn is_module_enabled(&self, name: &str) -> bool {
-        self.module_paths.get(name).is_some()
+    pub fn add_symlink(&mut self, module: &str, original: &Path, link: &Path) {
+        self.add(module, link, PathInfo::new_symlink(original));
     }
 
     pub fn remove_module(&mut self, name: &str) -> Result<()> {
@@ -139,18 +155,6 @@ impl State {
         let source_path = paths::sources()?.join(name);
         utils::fs::remove_all(&source_path)?;
         utils::fs::copy_all(path, &source_path)?;
-        Ok(())
-    }
-}
-
-impl Display for State {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        for (module, paths) in self.module_paths.iter() {
-            writeln!(f, "{}", module.magenta())?;
-            for path in paths.iter() {
-                writeln!(f, "  {}", path.pretty())?;
-            }
-        }
         Ok(())
     }
 }
