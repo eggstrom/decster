@@ -132,11 +132,11 @@ impl State {
             Source::Text(text) => self.add_text_source(name, text),
             Source::Path(path) => self.add_path_source(name, path),
         }
-        .with_context(|| format!("Couldn't add source: {}", name.magenta()))
+        .with_context(|| format!("Couldn't add source: {}", name))
     }
 
     fn add_text_source(&self, name: &SourceName, text: &str) -> Result<()> {
-        println!("{} {} (text)", "  Added:".green(), name.magenta());
+        println!("{} {} (text)", "  Added:".green(), name);
 
         let source_path = paths::sources().join(name);
         fs::write(&source_path, text)
@@ -149,7 +149,7 @@ impl State {
         P: AsRef<Path>,
     {
         let path = path.as_ref();
-        println!("{} {} (path)", "  Added:".green(), name.magenta());
+        println!("{} {} (path)", "  Added:".green(), name);
 
         let source_path = paths::sources().join(name);
         utils::fs::remove_all(&source_path)?;

@@ -5,7 +5,6 @@ use std::{
 };
 
 use anyhow::{Result, anyhow};
-use crossterm::style::Stylize;
 use serde::Deserialize;
 
 use crate::{
@@ -32,7 +31,7 @@ impl Config {
     pub fn source(&self, name: &SourceName) -> Result<&Source> {
         self.sources
             .get(name)
-            .ok_or(anyhow!("Couldn't find source: {}", name.magenta()))
+            .ok_or(anyhow!("Couldn't find source: {}", name))
     }
 
     pub fn modules(

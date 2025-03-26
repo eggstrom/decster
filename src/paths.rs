@@ -48,7 +48,7 @@ pub fn init() -> Result<()> {
 }
 
 fn paths() -> &'static Paths {
-    PATHS.get().expect("`paths::init` should be called and return `Ok` before any other function in `paths` is called")
+    PATHS.get().expect("`paths::init` should be called without failing before any other function in `paths` is called")
 }
 
 pub fn home() -> &'static Path {
