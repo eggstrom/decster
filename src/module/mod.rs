@@ -4,6 +4,7 @@ use std::{
 };
 
 use anyhow::Result;
+use crossterm::style::Stylize;
 use file::ModuleFile;
 use serde::Deserialize;
 
@@ -57,14 +58,18 @@ impl Module {
     }
 
     pub fn add_sources(&self, config: &Config, state: &mut State) -> Result<()> {
+        println!("  Adding sources");
         for name in self.sources() {
             let source = config.source(name)?;
-            state.add_source(name, source)?;
+            match state.add_source(name, source) {
+                Ok(_) => println!("    {} {name} ({source})", "Added:".green()),
+                Err(error) => println!("    {} {name} ({error})", "Failed:".red()),
+            }
         }
         Ok(())
     }
 
-    pub fn enable(&self, state: &mut State, name: &str) -> Result<()> {
+    pub fn create_files(&self, state: &mut State, name: &str) -> Result<()> {
         println!("  Creating files");
         for files in self.files() {
             files.create_files(state, name);

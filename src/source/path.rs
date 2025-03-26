@@ -33,7 +33,7 @@ impl SourcePath {
 }
 
 impl Display for SourcePath {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match &self.path {
             Some(path) => write!(f, "{}/{}", self.name, path.pretty()),
             None => self.name.fmt(f),

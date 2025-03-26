@@ -128,31 +128,23 @@ impl State {
     }
 
     pub fn add_source(&self, name: &SourceName, source: &Source) -> Result<()> {
-        match source {
-            Source::Text(text) => self.add_text_source(name, text),
-            Source::Path(path) => self.add_path_source(name, path),
-        }
-        .with_context(|| format!("Couldn't add source: {}", name))
-    }
-
-    fn add_text_source(&self, name: &SourceName, text: &str) -> Result<()> {
-        println!("{} {} (text)", "  Added:".green(), name);
-
         let source_path = paths::sources().join(name);
-        fs::write(&source_path, text)
-            .with_context(|| format!("Couldn't write to file: {}", source_path.pretty()))?;
+        if source_path.exists() {
+            utils::fs::remove_all(&source_path)?;
+        }
+
+        match source {
+            Source::Text(text) => self.add_text_source(&source_path, text)?,
+            Source::Path(path) => self.add_path_source(&source_path, path)?,
+        }
         Ok(())
     }
 
-    fn add_path_source<P>(&self, name: &SourceName, path: P) -> Result<()>
-    where
-        P: AsRef<Path>,
-    {
-        let path = path.as_ref();
-        println!("{} {} (path)", "  Added:".green(), name);
+    fn add_text_source(&self, source_path: &Path, text: &str) -> io::Result<()> {
+        fs::write(&source_path, text)
+    }
 
-        let source_path = paths::sources().join(name);
-        utils::fs::remove_all(&source_path)?;
+    fn add_path_source(&self, source_path: &Path, path: &Path) -> Result<()> {
         utils::fs::copy_all(path, &source_path)?;
         Ok(())
     }

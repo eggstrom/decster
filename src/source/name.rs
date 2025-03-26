@@ -44,7 +44,7 @@ impl FromStr for SourceName {
 }
 
 impl Display for SourceName {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         self.0.as_str().magenta().fmt(f)
     }
 }
