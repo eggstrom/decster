@@ -1,26 +1,23 @@
 use std::collections::HashSet;
 
 use anyhow::Result;
+use clap::Parser;
 
 use crate::{
-    cli::{Behavior, Cli, Command, InfoArgs},
-    config::Config,
-    paths,
+    cli::{Cli, Command, InfoArgs},
+    global,
     state::State,
 };
 
 pub struct App {
-    behavior: Behavior,
-    config: Config,
     state: State,
 }
+
 impl App {
-    pub fn run(cli: Cli) -> Result<()> {
-        paths::init()?;
-        let config = Config::parse(cli.config.as_deref())?;
+    pub fn run() -> Result<()> {
+        let cli = Cli::parse();
+        global::init(&cli)?;
         let mut app = App {
-            behavior: cli.behavior,
-            config,
             state: State::load()?,
         };
 
@@ -39,10 +36,10 @@ impl App {
 
     fn enable(&mut self, modules: HashSet<String>) -> Result<()> {
         if modules.is_empty() {
-            self.config.enable_all_modules(&mut self.state);
+            self.state.enable_all_modules();
         } else {
             for module in modules {
-                self.config.enable_module(&mut self.state, &module);
+                self.state.enable_module(&module);
             }
         }
         self.state.save()

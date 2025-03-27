@@ -1,18 +1,15 @@
-use std::{
-    path::{Path, PathBuf},
-    sync::OnceLock,
-};
+use std::path::{Path, PathBuf};
 
 use anyhow::{Result, anyhow};
 
 const APP_NAME: &str = "decster";
 
-struct Paths {
-    home: PathBuf,
-    config: PathBuf,
-    data: PathBuf,
-    sources: PathBuf,
-    state: PathBuf,
+pub(super) struct Paths {
+    pub home: PathBuf,
+    pub config: PathBuf,
+    pub data: PathBuf,
+    pub sources: PathBuf,
+    pub state: PathBuf,
 }
 
 impl Paths {
@@ -37,18 +34,8 @@ impl Paths {
     }
 }
 
-static PATHS: OnceLock<Paths> = OnceLock::new();
-
-pub fn init() -> Result<()> {
-    PATHS
-        .set(Paths::new()?)
-        .ok()
-        .expect("`paths::init` should only be called once");
-    Ok(())
-}
-
 fn paths() -> &'static Paths {
-    PATHS.get().expect("`paths::init` should be called without failing before any other function in `paths` is called")
+    &super::state().paths
 }
 
 pub fn home() -> &'static Path {

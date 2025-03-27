@@ -11,7 +11,8 @@ use path_info::PathInfo;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    paths,
+    global::{config, paths},
+    module::Module,
     source::{Source, name::SourceName},
     utils::{self, fs::Sha256Hash, output::Pretty},
 };
@@ -112,6 +113,37 @@ impl State {
         } else {
             println!("Module {} isn't enabled", module.magenta());
         }
+    }
+
+    pub fn enable_module(&mut self, name: &str) {
+        if self.is_module_enabled(name) {
+            println!("Module {} is already enabled", name.magenta());
+        } else if let Some(module) = config::module(name) {
+            self.enable_module_inner(name, module);
+        } else {
+            println!("Module {} isn't defined", name.magenta());
+        }
+    }
+
+    pub fn enable_all_modules(&mut self) {
+        let mut has_enabled = false;
+        for (name, module) in config::modules() {
+            if !self.is_module_enabled(name) {
+                self.enable_module_inner(name, module);
+                has_enabled = true;
+            }
+        }
+        if !has_enabled {
+            println!("There are no disabled modules");
+        }
+    }
+
+    fn enable_module_inner(&mut self, name: &str, module: &Module) {
+        println!("Enabling module {}", name.magenta());
+        module.add_sources(self);
+        module.create_files(self, name);
+        module.create_hard_links(self, name);
+        module.create_symlinks(self, name);
     }
 
     pub fn disable_all_modules(&mut self) {

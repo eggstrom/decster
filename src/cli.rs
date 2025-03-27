@@ -15,7 +15,7 @@ pub struct Cli {
     pub config: Option<PathBuf>,
 }
 
-#[derive(Args, Clone, Debug)]
+#[derive(Args, Clone, Debug, Default)]
 pub struct Behavior {
     /// Surpress output
     #[arg(long, short, global = true)]
@@ -26,12 +26,6 @@ pub struct Behavior {
     /// Overwrite existing files
     #[arg(long, short, global = true)]
     pub force: bool,
-    /// Ignore files that require elevated privileges
-    #[arg(long, short, global = true)]
-    pub ignore: bool,
-    /// Skip modules with files that require elevated privileges
-    #[arg(long, short, global = true)]
-    pub skip: bool,
 }
 
 #[derive(Clone, Debug, Subcommand)]
