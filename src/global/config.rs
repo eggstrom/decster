@@ -33,7 +33,9 @@ impl Config {
             .as_deref()
             .unwrap_or(&paths.config)
             .join("config.toml");
-        Ok(toml::from_str(&fs::read_to_string(path)?)?)
+        let mut config: Config = toml::from_str(&fs::read_to_string(path)?)?;
+        config.behavior = cli.behavior.clone();
+        Ok(config)
     }
 }
 
