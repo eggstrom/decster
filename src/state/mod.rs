@@ -46,13 +46,12 @@ impl State {
         self.module_paths.get(module).is_some()
     }
 
-    /// Gets the owner of `path`.
-    pub fn owner<P>(&self, path: P) -> Option<&str>
+    pub fn is_path_used<P>(&self, path: P) -> bool
     where
         P: AsRef<Path>,
     {
         let path = path.as_ref();
-        self.path_info.get(path).map(|(module, _)| module.as_ref())
+        self.path_info.get(path).is_some()
     }
 
     pub fn add_source(&self, name: &SourceName, source: &Source) -> Result<()> {
@@ -107,14 +106,6 @@ impl State {
         self.add(module, link, PathInfo::Symlink { path });
     }
 
-    pub fn disable_module(&mut self, module: &str) {
-        if let Some((module, paths)) = self.module_paths.remove_entry(module) {
-            self.disable_module_inner(module, paths);
-        } else {
-            println!("Module {} isn't enabled", module.magenta());
-        }
-    }
-
     pub fn enable_module(&mut self, name: &str) {
         if self.is_module_enabled(name) {
             println!("Module {} is already enabled", name.magenta());
@@ -146,9 +137,17 @@ impl State {
         module.create_symlinks(self, name);
     }
 
+    pub fn disable_module(&mut self, name: &str) {
+        if let Some((module, paths)) = self.module_paths.remove_entry(name) {
+            self.disable_module_inner(module, paths);
+        } else {
+            println!("Module {} isn't enabled", name.magenta());
+        }
+    }
+
     pub fn disable_all_modules(&mut self) {
         if self.module_paths.is_empty() {
-            println!("There are no disabled modules");
+            println!("There are no enabled modules");
         } else {
             for (module, paths) in mem::take(&mut self.module_paths) {
                 self.disable_module_inner(module, paths);
@@ -156,8 +155,8 @@ impl State {
         }
     }
 
-    fn disable_module_inner(&mut self, module: Rc<str>, paths: Vec<Rc<Path>>) {
-        println!("Disabling module {}", module.magenta());
+    fn disable_module_inner(&mut self, name: Rc<str>, paths: Vec<Rc<Path>>) {
+        println!("Disabling module {}", name.magenta());
         // Any paths that can't be removed will be put back into the state.
         // This is a VecDeque because they need to be insrted in reverse order.
         let mut unremovable_paths = VecDeque::new();
@@ -176,7 +175,32 @@ impl State {
         }
 
         if !unremovable_paths.is_empty() {
-            self.module_paths.insert(module, unremovable_paths.into());
+            self.module_paths.insert(name, unremovable_paths.into());
+        }
+    }
+
+    pub fn update_module(&mut self, name: &str) {
+        if let Some((name_rc, paths)) = self.module_paths.remove_entry(name) {
+            self.disable_module_inner(name_rc, paths);
+            if let Some(module) = config::module(name) {
+                self.enable_module_inner(name, module);
+            }
+        } else {
+            println!("Module {} isn't enabled", name.magenta());
+        }
+    }
+
+    pub fn update_all_modules(&mut self) {
+        if self.module_paths.is_empty() {
+            println!("There are no enabled modules");
+        } else {
+            for (name, paths) in mem::take(&mut self.module_paths) {
+                let module = config::module(&name).map(|module| (name.to_string(), module));
+                self.disable_module_inner(name, paths);
+                if let Some((name, module)) = module {
+                    self.enable_module_inner(&name, module);
+                }
+            }
         }
     }
 }

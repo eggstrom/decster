@@ -55,11 +55,11 @@ pub fn force() -> bool {
     config().behavior.force
 }
 
-pub fn source(name: &SourceName) -> Option<&Source> {
+pub fn source(name: &SourceName) -> Option<&'static Source> {
     config().sources.get(name)
 }
 
-pub fn module(name: &str) -> Option<&Module> {
+pub fn module(name: &str) -> Option<&'static Module> {
     config().modules.get(name)
 }
 

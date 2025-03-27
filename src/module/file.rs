@@ -34,34 +34,29 @@ impl<'a> ModuleFile<'a> {
                 Some(_) => Cow::Owned(self.path.join(rel_path)),
             };
 
-            match state.owner(&new_path) {
-                Some(module) => println!(
-                    "{} {} (Path is owned by {})",
-                    "Failed:".red(),
-                    new_path.pretty(),
-                    module.magenta()
-                ),
-                None => {
-                    if let Err(err) = match path.is_dir() {
-                        true => state.create_dir(name, &new_path),
-                        false => f(state, path, &new_path),
-                    } {
-                        println!("    {} {} ({err})", "Failed:".red(), new_path.pretty())
-                    } else {
-                        println!("    {} {}", "Created:".green(), new_path.pretty());
-                    }
+            if state.is_path_used(&new_path) {
+                println!("{} {} (Path is in use)", "Failed:".red(), new_path.pretty())
+            } else {
+                if let Err(err) = if path.is_dir() {
+                    state.create_dir(name, &new_path)
+                } else {
+                    f(state, path, &new_path)
+                } {
+                    println!("    {} {} ({err})", "Failed:".red(), new_path.pretty())
+                } else {
+                    println!("    {} {}", "Created:".green(), new_path.pretty());
                 }
             }
             Ok(())
         });
     }
 
-    pub fn create_files(&self, state: &mut State, name: &str) {
-        self.create_with(state, name, |state, from, to| {
+    pub fn create_files(&self, state: &mut State, module: &str) {
+        self.create_with(state, module, |state, from, to| {
             let size = from.metadata()?.size();
             let hash = utils::fs::hash_file(from)?;
             io::copy(&mut File::open(from)?, &mut File::create_new(to)?)?;
-            state.add_file(name, to, size, hash);
+            state.add_file(module, to, size, hash);
             Ok(())
         });
     }
@@ -76,10 +71,10 @@ impl<'a> ModuleFile<'a> {
         });
     }
 
-    pub fn create_symlinks(&self, state: &mut State, name: &str) {
-        self.create_with(state, name, |state, original, link| {
+    pub fn create_symlinks(&self, state: &mut State, module: &str) {
+        self.create_with(state, module, |state, original, link| {
             unix::fs::symlink(original, link)?;
-            state.add_symlink(name, original, link);
+            state.add_symlink(module, original, link);
             Ok(())
         });
     }
