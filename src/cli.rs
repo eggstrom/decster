@@ -31,16 +31,16 @@ pub struct Behavior {
 #[derive(Clone, Debug, Subcommand)]
 pub enum Command {
     /// Display information about modules
-    #[command(visible_alias = "i")]
+    #[command(alias = "i")]
     Info(InfoArgs),
     /// Enable modules
-    #[command(visible_aliases = ["e"])]
+    #[command(alias = "e")]
     Enable { modules: Vec<String> },
     /// Disable modules
-    #[command(visible_alias = "d")]
+    #[command(alias = "d")]
     Disable { modules: Vec<String> },
-    /// Update modules
-    #[command(visible_alias = "u")]
+    /// Disable and re-enable modules
+    #[command(alias = "u")]
     Update { modules: Vec<String> },
 }
 
