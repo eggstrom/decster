@@ -95,7 +95,8 @@ impl PathInfo {
         let path = path.as_ref();
         match self.state(path) {
             PathState::OwnedDirectory => {
-                let _ = fs::remove_dir(path);
+                fs::remove_dir(path)?;
+                println!("{} {}", "  Removed:".green(), path.pretty());
             }
             PathState::OwnedFile | PathState::OwnedHardLink | PathState::OwnedSymlink => {
                 fs::remove_file(path)?;

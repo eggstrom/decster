@@ -11,7 +11,7 @@ use crossterm::style::Stylize;
 use crate::{
     global::paths,
     source::path::SourcePath,
-    state::State,
+    state::{State, path_info::PathInfo},
     utils::{self, output::Pretty},
 };
 
@@ -57,7 +57,7 @@ impl<'a> ModuleFile<'a> {
             let size = from.metadata()?.size();
             let hash = utils::fs::hash_file(from)?;
             io::copy(&mut File::open(from)?, &mut File::create_new(to)?)?;
-            state.add_file(module, to, size, hash);
+            state.add(module, to, PathInfo::File { size, hash });
             Ok(())
         });
     }
@@ -67,7 +67,7 @@ impl<'a> ModuleFile<'a> {
             let size = original.metadata()?.size();
             let hash = utils::fs::hash_file(original)?;
             fs::hard_link(original, link)?;
-            state.add_hard_link(module, link, size, hash);
+            state.add(module, link, PathInfo::HardLink { size, hash });
             Ok(())
         });
     }
@@ -75,7 +75,8 @@ impl<'a> ModuleFile<'a> {
     pub fn create_symlinks(&self, state: &mut State, module: &str) {
         self.create_with(state, module, |state, original, link| {
             unix::fs::symlink(original, link)?;
-            state.add_symlink(module, original, link);
+            let path = original.to_path_buf();
+            state.add(module, link, PathInfo::Symlink { path });
             Ok(())
         });
     }

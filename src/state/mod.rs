@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap, VecDeque},
+    collections::{BTreeMap, HashSet, VecDeque},
     fs, io, mem,
     path::Path,
     rc::Rc,
@@ -14,15 +14,15 @@ use crate::{
     global::{config, paths},
     module::Module,
     source::{Source, name::SourceName},
-    utils::{self, fs::Sha256Hash, output::Pretty},
+    utils::{self, output::Pretty},
 };
 
 pub mod path_info;
 
 #[derive(Default, Deserialize, Serialize)]
 pub struct State {
-    module_paths: BTreeMap<Rc<str>, Vec<Rc<Path>>>,
-    path_info: HashMap<Rc<Path>, (Rc<str>, PathInfo)>,
+    module_paths: BTreeMap<Rc<str>, Vec<(Rc<Path>, PathInfo)>>,
+    paths: HashSet<Rc<Path>>,
 }
 
 impl State {
@@ -50,11 +50,10 @@ impl State {
     where
         P: AsRef<Path>,
     {
-        let path = path.as_ref();
-        self.path_info.get(path).is_some()
+        self.paths.contains(path.as_ref())
     }
 
-    pub fn add_source(&self, name: &SourceName, source: &Source) -> Result<()> {
+    pub fn add_source(&self, name: &SourceName, source: &Source) -> io::Result<()> {
         let source_path = paths::sources().join(name);
         if source_path.exists() {
             utils::fs::remove_all(&source_path)?;
@@ -75,14 +74,14 @@ impl State {
         utils::fs::copy_all(path, &source_path)
     }
 
-    fn add(&mut self, module: &str, path: &Path, info: PathInfo) {
-        let module = Rc::from(module);
+    pub fn add(&mut self, module: &str, path: &Path, info: PathInfo) {
         let path = Rc::from(path);
-        self.module_paths
-            .entry(Rc::clone(&module))
-            .or_insert_with(|| Vec::new())
-            .push(Rc::clone(&path));
-        self.path_info.insert(path, (module, info));
+        self.paths.insert(Rc::clone(&path));
+        if let Some(paths) = self.module_paths.get_mut(module) {
+            paths.push((path, info));
+        } else {
+            self.module_paths.insert(module.into(), vec![(path, info)]);
+        }
     }
 
     pub fn create_dir(&mut self, module: &str, path: &Path) -> io::Result<()> {
@@ -91,19 +90,6 @@ impl State {
             self.add(module, path, PathInfo::Directory);
         }
         Ok(())
-    }
-
-    pub fn add_file(&mut self, module: &str, path: &Path, size: u64, hash: Sha256Hash) {
-        self.add(module, path, PathInfo::File { size, hash });
-    }
-
-    pub fn add_hard_link(&mut self, module: &str, path: &Path, size: u64, hash: Sha256Hash) {
-        self.add(module, path, PathInfo::HardLink { size, hash });
-    }
-
-    pub fn add_symlink(&mut self, module: &str, original: &Path, link: &Path) {
-        let path = original.to_path_buf();
-        self.add(module, link, PathInfo::Symlink { path });
     }
 
     pub fn enable_module(&mut self, name: &str) {
@@ -155,27 +141,25 @@ impl State {
         }
     }
 
-    fn disable_module_inner(&mut self, name: Rc<str>, paths: Vec<Rc<Path>>) {
+    fn disable_module_inner(&mut self, name: Rc<str>, paths: Vec<(Rc<Path>, PathInfo)>) {
         println!("Disabling module {}", name.magenta());
         // Any paths that can't be removed will be put back into the state.
-        // This is a VecDeque because they need to be insrted in reverse order.
-        let mut unremovable_paths = VecDeque::new();
+        let mut unremovable_paths = Vec::new();
 
         // Paths are removed in reverse order to make sure directories are
         // removed last.
-        for path in paths.into_iter().rev() {
-            if let Some((_, path_info)) = self.path_info.get(&path) {
-                if let Err(err) = path_info.remove_if_owned(&path) {
-                    println!("{} {} ({err})", "Failed:".red(), path.pretty());
-                    unremovable_paths.push_front(path);
-                } else {
-                    self.path_info.remove(&path);
-                }
+        for (path, info) in paths.into_iter().rev() {
+            if let Err(err) = info.remove_if_owned(&path) {
+                println!("{} {} ({err})", "Failed:".red(), path.pretty());
+                unremovable_paths.push((path, info));
+            } else {
+                self.paths.remove(&path);
             }
         }
 
         if !unremovable_paths.is_empty() {
-            self.module_paths.insert(name, unremovable_paths.into());
+            unremovable_paths.reverse();
+            self.module_paths.insert(name, unremovable_paths);
         }
     }
 
