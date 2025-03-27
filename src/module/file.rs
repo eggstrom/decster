@@ -9,6 +9,7 @@ use std::{
 use crossterm::style::Stylize;
 
 use crate::{
+    global::paths,
     source::path::SourcePath,
     state::State,
     utils::{self, output::Pretty},
@@ -29,10 +30,10 @@ impl<'a> ModuleFile<'a> {
         F: FnMut(&mut State, &Path, &Path) -> io::Result<()>,
     {
         let _ = utils::fs::walk_dir_with_rel(self.source.path(), false, |path, rel_path| {
-            let new_path = match rel_path.parent() {
-                None => Cow::Borrowed(self.path),
-                Some(_) => Cow::Owned(self.path.join(rel_path)),
-            };
+            let mut new_path = paths::untildefy(self.path);
+            if let Some(_) = rel_path.parent() {
+                new_path = Cow::Owned(new_path.join(rel_path));
+            }
 
             if state.is_path_used(&new_path) {
                 println!("{} {} (Path is in use)", "Failed:".red(), new_path.pretty())

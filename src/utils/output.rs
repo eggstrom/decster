@@ -5,6 +5,8 @@ use std::{
 
 use crossterm::style::Stylize;
 
+use crate::global::paths;
+
 pub trait Pretty {
     type Target<'a>: Display
     where
@@ -19,7 +21,7 @@ impl Display for PrettyPath<'_> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         if let Some(file) = self.0.file_name() {
             if let Some(path) = self.0.parent() {
-                write!(f, "{}/", path.display())?;
+                write!(f, "{}/", paths::tildefy(path).display())?;
             }
             file.to_string_lossy().magenta().fmt(f)?;
         }
