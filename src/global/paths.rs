@@ -25,7 +25,7 @@ impl Paths {
             .map(|path| path.join(APP_NAME))
             .ok_or(anyhow!("Couldn't determine path of data directory"))?;
         let sources = data.join("sources");
-        let state = data.join("state.toml");
+        let state = data.join("state");
 
         Ok(Paths {
             home,

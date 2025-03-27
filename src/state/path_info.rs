@@ -4,8 +4,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use bincode::{Decode, Encode};
 use crossterm::style::Stylize;
-use serde::{Deserialize, Serialize};
 
 use crate::{
     global::config,
@@ -13,8 +13,7 @@ use crate::{
     utils::{self, fs::Sha256Hash, output::Pretty},
 };
 
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case")]
+#[derive(Decode, Encode)]
 pub enum PathInfo {
     Directory,
     File { size: u64, hash: Sha256Hash },

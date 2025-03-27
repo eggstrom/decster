@@ -1,14 +1,14 @@
 use std::{
     collections::{BTreeMap, HashSet},
-    fs, io, mem,
-    path::Path,
-    rc::Rc,
+    fs::{self, File},
+    io, mem,
+    path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result};
+use bincode::{Decode, Encode, config::Configuration};
 use crossterm::style::Stylize;
 use path_info::PathInfo;
-use serde::{Deserialize, Serialize};
 
 use crate::{
     global::{config, paths},
@@ -20,27 +20,30 @@ use crate::{
 
 pub mod path_info;
 
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Decode, Default, Encode)]
 pub struct State {
-    module_paths: BTreeMap<Rc<str>, Vec<(Rc<Path>, PathInfo)>>,
-    paths: HashSet<Rc<Path>>,
+    module_paths: BTreeMap<String, Vec<(PathBuf, PathInfo)>>,
+    paths: HashSet<PathBuf>,
 }
 
 impl State {
     pub fn load() -> Result<Self> {
         fs::create_dir_all(paths::sources())
             .with_context(|| format!("Couldn't create path: {}", paths::sources().pretty()))?;
-
-        Ok(fs::read_to_string(paths::state())
+        Ok(File::open(paths::state())
             .ok()
-            .and_then(|string| toml::from_str(&string).ok())
+            .and_then(|mut file| bincode::decode_from_std_read(&mut file, Self::bin_config()).ok())
             .unwrap_or_default())
     }
 
     pub fn save(&self) -> Result<()> {
-        let path = paths::state();
-        fs::write(path, toml::to_string(self)?)?;
+        let mut file = File::create(paths::state())?;
+        bincode::encode_into_std_write(self, &mut file, Self::bin_config())?;
         Ok(())
+    }
+
+    fn bin_config() -> Configuration {
+        bincode::config::standard()
     }
 
     pub fn is_module_enabled(&self, module: &str) -> bool {
@@ -76,12 +79,12 @@ impl State {
     }
 
     pub fn add_path(&mut self, module: &str, path: &Path, info: PathInfo) {
-        let path = Rc::from(path);
-        self.paths.insert(Rc::clone(&path));
+        self.paths.insert(path.to_path_buf());
         if let Some(paths) = self.module_paths.get_mut(module) {
-            paths.push((path, info));
+            paths.push((path.to_path_buf(), info));
         } else {
-            self.module_paths.insert(module.into(), vec![(path, info)]);
+            self.module_paths
+                .insert(module.into(), vec![(path.to_path_buf(), info)]);
         }
     }
 
@@ -99,7 +102,7 @@ impl State {
         &self,
         modules: HashSet<String>,
         filter: ModuleFilter,
-    ) -> impl Iterator<Item = (&str, &Module, Option<&Vec<(Rc<Path>, PathInfo)>>)> {
+    ) -> impl Iterator<Item = (&str, &Module, Option<&Vec<(PathBuf, PathInfo)>>)> {
         config::modules()
             .map(|(name, module)| (name, module, self.module_paths.get(name)))
             .filter(move |(name, _, paths)| {
@@ -161,8 +164,8 @@ impl State {
         }
     }
 
-    fn disable_module_inner(&mut self, name: Rc<str>, paths: Vec<(Rc<Path>, PathInfo)>) {
-        out!("Disabling module {}", name.magenta());
+    fn disable_module_inner(&mut self, name: String, paths: Vec<(PathBuf, PathInfo)>) {
+        out!("Disabling module {}", name.as_str().magenta());
         out!("  Removing owned paths");
         // Any paths that can't be removed will be put back into the state.
         let mut unremovable_paths = Vec::new();
