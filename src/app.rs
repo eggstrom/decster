@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 use anyhow::Result;
 use clap::Parser;
@@ -34,7 +34,7 @@ impl App {
         todo!()
     }
 
-    fn enable(mut self, modules: HashSet<String>) -> Result<()> {
+    fn enable(mut self, modules: BTreeSet<String>) -> Result<()> {
         if modules.is_empty() {
             self.state.enable_all_modules();
         } else {
@@ -45,7 +45,7 @@ impl App {
         self.state.save()
     }
 
-    fn disable(mut self, modules: HashSet<String>) -> Result<()> {
+    fn disable(mut self, modules: BTreeSet<String>) -> Result<()> {
         if modules.is_empty() {
             self.state.disable_all_modules();
         } else {
@@ -56,7 +56,7 @@ impl App {
         self.state.save()
     }
 
-    fn update(mut self, modules: HashSet<String>) -> Result<()> {
+    fn update(mut self, modules: BTreeSet<String>) -> Result<()> {
         if modules.is_empty() {
             self.state.update_all_modules();
         } else {
