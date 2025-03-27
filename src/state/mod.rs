@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     global::{config, paths},
     module::Module,
+    out,
     source::{Source, name::SourceName},
     utils::{self, output::Pretty},
 };
@@ -113,11 +114,11 @@ impl State {
 
     pub fn enable_module(&mut self, name: &str) {
         if self.is_module_enabled(name) {
-            println!("Module {} isn't disabled", name.magenta());
+            out!("Module {} isn't disabled", name.magenta());
         } else if let Some(module) = config::module(name) {
             self.enable_module_inner(name, module);
         } else {
-            println!("Module {} isn't defined", name.magenta());
+            out!("Module {} isn't defined", name.magenta());
         }
     }
 
@@ -130,12 +131,12 @@ impl State {
             }
         }
         if !has_enabled {
-            println!("There are no disabled modules");
+            out!("There are no disabled modules");
         }
     }
 
     fn enable_module_inner(&mut self, name: &str, module: &Module) {
-        println!("Enabling module {}", name.magenta());
+        out!("Enabling module {}", name.magenta());
         module.add_sources(self);
         module.create_files(self, name);
         module.create_hard_links(self, name);
@@ -146,13 +147,13 @@ impl State {
         if let Some((module, paths)) = self.module_paths.remove_entry(name) {
             self.disable_module_inner(module, paths);
         } else {
-            println!("Module {} isn't enabled", name.magenta());
+            out!("Module {} isn't enabled", name.magenta());
         }
     }
 
     pub fn disable_all_modules(&mut self) {
         if self.module_paths.is_empty() {
-            println!("There are no enabled modules");
+            out!("There are no enabled modules");
         } else {
             for (module, paths) in mem::take(&mut self.module_paths) {
                 self.disable_module_inner(module, paths);
@@ -161,8 +162,8 @@ impl State {
     }
 
     fn disable_module_inner(&mut self, name: Rc<str>, paths: Vec<(Rc<Path>, PathInfo)>) {
-        println!("Disabling module {}", name.magenta());
-        println!("  Removing owned paths");
+        out!("Disabling module {}", name.magenta());
+        out!("  Removing owned paths");
         // Any paths that can't be removed will be put back into the state.
         let mut unremovable_paths = Vec::new();
 
@@ -170,7 +171,7 @@ impl State {
         // removed last.
         for (path, info) in paths.into_iter().rev() {
             if let Err(err) = info.remove_if_owned(&path) {
-                println!("{} {} ({err})", "Failed:".red(), path.pretty());
+                out!("{} {} ({err})", "Failed:".red(), path.pretty());
                 unremovable_paths.push((path, info));
             } else {
                 self.paths.remove(&path);
@@ -190,13 +191,13 @@ impl State {
                 self.enable_module_inner(name, module);
             }
         } else {
-            println!("Module {} isn't enabled", name.magenta());
+            out!("Module {} isn't enabled", name.magenta());
         }
     }
 
     pub fn update_all_modules(&mut self) {
         if self.module_paths.is_empty() {
-            println!("There are no enabled modules");
+            out!("There are no enabled modules");
         } else {
             for (name, paths) in mem::take(&mut self.module_paths) {
                 let module = config::module(&name).map(|module| (name.to_string(), module));

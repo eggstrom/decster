@@ -10,7 +10,8 @@ use std::{
 use crossterm::style::Stylize;
 
 use crate::{
-    global::paths,
+    global::{config, paths},
+    out,
     source::path::SourcePath,
     state::{State, path_info::PathInfo},
     utils::{self, output::Pretty},
@@ -37,16 +38,20 @@ impl<'a> ModuleLink<'a> {
             }
 
             if state.is_path_used(&new_path) {
-                println!("{} {} (Path is in use)", "Failed:".red(), new_path.pretty())
+                out!(
+                    "    {} {} (Path is in use)",
+                    "Failed:".red(),
+                    new_path.pretty()
+                )
             } else {
                 if let Err(err) = if path.is_dir() {
                     state.create_dir(name, &new_path)
                 } else {
                     f(state, path, &new_path)
                 } {
-                    println!("    {} {} ({err})", "Failed:".red(), new_path.pretty())
+                    out!("    {} {} ({err})", "Failed:".red(), new_path.pretty())
                 } else {
-                    println!("    {} {}", "Created:".green(), new_path.pretty());
+                    out!("    {} {}", "Created:".green(), new_path.pretty());
                 }
             }
             Ok(())

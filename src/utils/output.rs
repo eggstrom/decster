@@ -7,6 +7,15 @@ use crossterm::style::Stylize;
 
 use crate::global::paths;
 
+#[macro_export]
+macro_rules! out {
+    ($($arg:expr),*) => {
+        if !config::quiet() {
+            println!($($arg),*);
+        }
+    }
+}
+
 pub trait Pretty {
     type Target<'a>: Display
     where

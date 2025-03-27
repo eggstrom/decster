@@ -9,6 +9,7 @@ use serde::Deserialize;
 
 use crate::{
     global::config,
+    out,
     source::{name::SourceName, path::SourcePath},
     state::State,
 };
@@ -59,15 +60,15 @@ impl Module {
     pub fn add_sources(&self, state: &mut State) {
         let sources = self.sources();
         if sources.size_hint().0 > 0 {
-            println!("  Adding sources");
+            out!("  Adding sources");
             for name in self.sources() {
                 if let Some(source) = config::source(name) {
                     match state.add_source(name, source) {
-                        Ok(_) => println!("    {} {name} ({source})", "Added:".green()),
-                        Err(err) => println!("    {} {name} ({err})", "Failed:".red()),
+                        Ok(_) => out!("    {} {name} ({source})", "Added:".green()),
+                        Err(err) => out!("    {} {name} ({err})", "Failed:".red()),
                     }
                 } else {
-                    println!(
+                    out!(
                         "{} {} (Source isn't defined)",
                         "Failed:".red(),
                         name.magenta()
@@ -80,7 +81,7 @@ impl Module {
     pub fn create_files(&self, state: &mut State, module: &str) {
         let files = self.files();
         if files.len() > 0 {
-            println!("  Creating files");
+            out!("  Creating files");
             for file in files {
                 file.create_files(state, module);
             }
@@ -90,7 +91,7 @@ impl Module {
     pub fn create_hard_links(&self, state: &mut State, module: &str) {
         let hard_links = self.hard_links();
         if hard_links.len() > 0 {
-            println!("  Creating hard links");
+            out!("  Creating hard links");
             for hard_link in hard_links {
                 hard_link.create_hard_links(state, module);
             }
@@ -100,7 +101,7 @@ impl Module {
     pub fn create_symlinks(&self, state: &mut State, module: &str) {
         let symlinks = self.symlinks();
         if symlinks.len() > 0 {
-            println!("  Creating symlinks");
+            out!("  Creating symlinks");
             for symlink in symlinks {
                 symlink.create_symlinks(state, module);
             }

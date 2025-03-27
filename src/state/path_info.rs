@@ -7,7 +7,11 @@ use std::{
 use crossterm::style::Stylize;
 use serde::{Deserialize, Serialize};
 
-use crate::utils::{self, fs::Sha256Hash, output::Pretty};
+use crate::{
+    global::config,
+    out,
+    utils::{self, fs::Sha256Hash, output::Pretty},
+};
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -96,21 +100,21 @@ impl PathInfo {
         match self.state(path) {
             PathState::OwnedDirectory => {
                 fs::remove_dir(path)?;
-                println!("{} {}", "    Removed:".green(), path.pretty());
+                out!("{} {}", "    Removed:".green(), path.pretty());
             }
             PathState::OwnedFile | PathState::OwnedHardLink | PathState::OwnedSymlink => {
                 fs::remove_file(path)?;
-                println!("{} {}", "    Removed:".green(), path.pretty());
+                out!("{} {}", "    Removed:".green(), path.pretty());
             }
             PathState::Changed => {
-                println!(
+                out!(
                     "{} {} (File changed)",
                     "  Skipping:".yellow(),
                     path.pretty()
                 )
             }
             PathState::Missing => {
-                println!(
+                out!(
                     "{} {} (File missing)",
                     "  Skipping:".yellow(),
                     path.pretty()
