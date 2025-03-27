@@ -2,14 +2,14 @@ use std::{collections::HashSet, path::PathBuf};
 
 use clap::{Args, Parser, Subcommand};
 
-use crate::module::ModuleFilter;
+use crate::state::ModuleFilter;
 
 #[derive(Debug, Parser)]
 pub struct Cli {
-    #[command(subcommand)]
-    pub command: Command,
     #[group(flatten)]
     pub behavior: Behavior,
+    #[command(subcommand)]
+    pub command: Command,
     /// Set path to config directory
     #[arg(long, short, value_name = "PATH", global = true)]
     pub config: Option<PathBuf>,
@@ -30,7 +30,7 @@ pub struct Behavior {
 
 #[derive(Clone, Debug, Subcommand)]
 pub enum Command {
-    /// Display information about modules
+    /// Display information
     #[command(alias = "i")]
     Info(InfoArgs),
     /// Enable modules

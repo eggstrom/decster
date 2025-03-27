@@ -1,5 +1,6 @@
 use std::{
     borrow::Cow,
+    fmt::{self, Display, Formatter},
     fs::{self, File},
     io,
     os::unix::{self, fs::MetadataExt},
@@ -15,14 +16,14 @@ use crate::{
     utils::{self, output::Pretty},
 };
 
-pub struct ModuleFile<'a> {
+pub struct ModuleLink<'a> {
     path: &'a Path,
     source: &'a SourcePath,
 }
 
-impl<'a> ModuleFile<'a> {
+impl<'a> ModuleLink<'a> {
     pub fn new(path: &'a Path, source: &'a SourcePath) -> Self {
-        ModuleFile { path, source }
+        ModuleLink { path, source }
     }
 
     fn create_with<F>(&self, state: &mut State, name: &str, mut f: F)
@@ -57,7 +58,7 @@ impl<'a> ModuleFile<'a> {
             let size = from.metadata()?.size();
             let hash = utils::fs::hash_file(from)?;
             io::copy(&mut File::open(from)?, &mut File::create_new(to)?)?;
-            state.add(module, to, PathInfo::File { size, hash });
+            state.add_path(module, to, PathInfo::File { size, hash });
             Ok(())
         });
     }
@@ -67,7 +68,7 @@ impl<'a> ModuleFile<'a> {
             let size = original.metadata()?.size();
             let hash = utils::fs::hash_file(original)?;
             fs::hard_link(original, link)?;
-            state.add(module, link, PathInfo::HardLink { size, hash });
+            state.add_path(module, link, PathInfo::HardLink { size, hash });
             Ok(())
         });
     }
@@ -76,8 +77,18 @@ impl<'a> ModuleFile<'a> {
         self.create_with(state, module, |state, original, link| {
             unix::fs::symlink(original, link)?;
             let path = original.to_path_buf();
-            state.add(module, link, PathInfo::Symlink { path });
+            state.add_path(module, link, PathInfo::Symlink { path });
             Ok(())
         });
+    }
+}
+
+impl Display for ModuleLink<'_> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{} -> {}", self.path.pretty(), self.source.name)?;
+        if let Some(source_path) = &self.source.path {
+            source_path.pretty().fmt(f)?;
+        }
+        Ok(())
     }
 }

@@ -2,11 +2,13 @@ use std::collections::BTreeSet;
 
 use anyhow::Result;
 use clap::Parser;
+use crossterm::style::Stylize;
 
 use crate::{
     cli::{Cli, Command, InfoArgs},
     global,
     state::State,
+    utils::output::Pretty,
 };
 
 pub struct App {
@@ -22,7 +24,7 @@ impl App {
         };
 
         match cli.command {
-            Command::Info(args) => app.info(args)?,
+            Command::Info(args) => app.info(args),
             Command::Enable { modules } => app.enable(modules.into_iter().collect())?,
             Command::Disable { modules } => app.disable(modules.into_iter().collect())?,
             Command::Update { modules } => app.update(modules.into_iter().collect())?,
@@ -30,8 +32,34 @@ impl App {
         Ok(())
     }
 
-    fn info(self, args: InfoArgs) -> Result<()> {
-        todo!()
+    fn info(self, args: InfoArgs) {
+        let (modules, filter) = args.modules();
+        for (name, module, paths) in self.state.modules(modules, filter) {
+            println!("Module {}", name.magenta());
+            let files = module.files();
+            let hard_links = module.hard_links();
+            let symlinks = module.symlinks();
+
+            if files.len() > 0 {
+                println!("  Files");
+                files.for_each(|link| println!("    {link}"));
+            }
+            if hard_links.len() > 0 {
+                println!("  Hard link");
+                hard_links.for_each(|link| println!("    {link}"));
+            }
+            if symlinks.len() > 0 {
+                println!("  Symlinks");
+                symlinks.for_each(|link| println!("    {link}"));
+            }
+
+            if let Some(paths) = paths {
+                println!("  Owned paths");
+                for (path, _) in paths {
+                    println!("    {}", path.pretty())
+                }
+            }
+        }
     }
 
     fn enable(mut self, modules: BTreeSet<String>) -> Result<()> {

@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashSet, VecDeque},
+    collections::{BTreeMap, HashSet},
     fs, io, mem,
     path::Path,
     rc::Rc,
@@ -74,7 +74,7 @@ impl State {
         utils::fs::copy_all(path, &source_path)
     }
 
-    pub fn add(&mut self, module: &str, path: &Path, info: PathInfo) {
+    pub fn add_path(&mut self, module: &str, path: &Path, info: PathInfo) {
         let path = Rc::from(path);
         self.paths.insert(Rc::clone(&path));
         if let Some(paths) = self.module_paths.get_mut(module) {
@@ -87,14 +87,33 @@ impl State {
     pub fn create_dir(&mut self, module: &str, path: &Path) -> io::Result<()> {
         if !path.is_dir() {
             fs::create_dir(path)?;
-            self.add(module, path, PathInfo::Directory);
+            self.add_path(module, path, PathInfo::Directory);
         }
         Ok(())
     }
 
+    /// Returns a list of module names, definitions, and owned paths, based on
+    /// the provided filter.
+    pub fn modules(
+        &self,
+        modules: HashSet<String>,
+        filter: ModuleFilter,
+    ) -> impl Iterator<Item = (&str, &Module, Option<&Vec<(Rc<Path>, PathInfo)>>)> {
+        config::modules()
+            .map(|(name, module)| (name, module, self.module_paths.get(name)))
+            .filter(move |(name, _, paths)| {
+                (modules.is_empty() || modules.contains(*name))
+                    && match filter {
+                        ModuleFilter::All => true,
+                        ModuleFilter::Enabled => paths.is_some(),
+                        ModuleFilter::Disabled => paths.is_none(),
+                    }
+            })
+    }
+
     pub fn enable_module(&mut self, name: &str) {
         if self.is_module_enabled(name) {
-            println!("Module {} is already enabled", name.magenta());
+            println!("Module {} isn't disabled", name.magenta());
         } else if let Some(module) = config::module(name) {
             self.enable_module_inner(name, module);
         } else {
@@ -143,6 +162,7 @@ impl State {
 
     fn disable_module_inner(&mut self, name: Rc<str>, paths: Vec<(Rc<Path>, PathInfo)>) {
         println!("Disabling module {}", name.magenta());
+        println!("  Removing owned paths");
         // Any paths that can't be removed will be put back into the state.
         let mut unremovable_paths = Vec::new();
 
@@ -187,4 +207,10 @@ impl State {
             }
         }
     }
+}
+
+pub enum ModuleFilter {
+    All,
+    Enabled,
+    Disabled,
 }

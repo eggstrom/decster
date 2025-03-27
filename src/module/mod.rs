@@ -4,7 +4,7 @@ use std::{
 };
 
 use crossterm::style::Stylize;
-use file::ModuleFile;
+use link::ModuleLink;
 use serde::Deserialize;
 
 use crate::{
@@ -13,7 +13,7 @@ use crate::{
     state::State,
 };
 
-pub mod file;
+pub mod link;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -30,25 +30,25 @@ pub struct Module {
 }
 
 impl Module {
-    fn files(&self) -> impl ExactSizeIterator<Item = ModuleFile> {
+    pub fn files(&self) -> impl ExactSizeIterator<Item = ModuleLink> {
         self.files
             .iter()
-            .map(|(path, source)| ModuleFile::new(path.as_path(), source))
+            .map(|(path, source)| ModuleLink::new(path.as_path(), source))
     }
 
-    fn hard_links(&self) -> impl ExactSizeIterator<Item = ModuleFile> {
+    pub fn hard_links(&self) -> impl ExactSizeIterator<Item = ModuleLink> {
         self.hard_links
             .iter()
-            .map(|(path, source)| ModuleFile::new(path.as_path(), source))
+            .map(|(path, source)| ModuleLink::new(path.as_path(), source))
     }
 
-    fn symlinks(&self) -> impl ExactSizeIterator<Item = ModuleFile> {
+    pub fn symlinks(&self) -> impl ExactSizeIterator<Item = ModuleLink> {
         self.symlinks
             .iter()
-            .map(|(path, source)| ModuleFile::new(path.as_path(), source))
+            .map(|(path, source)| ModuleLink::new(path.as_path(), source))
     }
 
-    fn sources(&self) -> impl Iterator<Item = &SourceName> {
+    pub fn sources(&self) -> impl Iterator<Item = &SourceName> {
         self.files
             .values()
             .chain(self.hard_links.values())
@@ -106,10 +106,4 @@ impl Module {
             }
         }
     }
-}
-
-pub enum ModuleFilter {
-    All,
-    Enabled,
-    Disabled,
 }

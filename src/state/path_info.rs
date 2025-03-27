@@ -96,11 +96,11 @@ impl PathInfo {
         match self.state(path) {
             PathState::OwnedDirectory => {
                 fs::remove_dir(path)?;
-                println!("{} {}", "  Removed:".green(), path.pretty());
+                println!("{} {}", "    Removed:".green(), path.pretty());
             }
             PathState::OwnedFile | PathState::OwnedHardLink | PathState::OwnedSymlink => {
                 fs::remove_file(path)?;
-                println!("{} {}", "  Removed:".green(), path.pretty());
+                println!("{} {}", "    Removed:".green(), path.pretty());
             }
             PathState::Changed => {
                 println!(
