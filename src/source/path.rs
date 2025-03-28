@@ -12,7 +12,7 @@ use serde::{
 };
 use thiserror::Error;
 
-use crate::{global::paths, utils::output::PathExt};
+use crate::{paths, utils::output::PathExt};
 
 use super::name::{ParseSourceNameError, SourceName};
 

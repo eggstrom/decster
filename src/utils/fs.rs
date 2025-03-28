@@ -4,6 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use anyhow::Result;
 use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 
@@ -11,10 +12,10 @@ use walkdir::WalkDir;
 ///
 /// `contents_first` determines whether the directory or it's contents are
 /// yielded first.
-pub fn walk_dir<P, F>(root: P, contents_first: bool, f: F) -> io::Result<()>
+pub fn walk_dir<P, F, E>(root: P, contents_first: bool, f: F) -> Result<(), E>
 where
     P: AsRef<Path>,
-    F: FnMut(PathBuf) -> io::Result<()>,
+    F: FnMut(PathBuf) -> Result<(), E>,
 {
     let root = root.as_ref();
     WalkDir::new(root)
@@ -30,10 +31,10 @@ where
 ///
 /// `contents_first` determines whether the directory or it's contents are
 /// yielded first.
-pub fn walk_dir_with_rel<P, F>(root: P, contents_first: bool, mut f: F) -> io::Result<()>
+pub fn walk_dir_with_rel<P, F, E>(root: P, contents_first: bool, mut f: F) -> Result<(), E>
 where
     P: AsRef<Path>,
-    F: FnMut(&Path, &Path) -> io::Result<()>,
+    F: FnMut(&Path, &Path) -> Result<(), E>,
 {
     let root = root.as_ref();
     walk_dir(root, contents_first, |path| {

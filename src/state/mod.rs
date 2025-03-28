@@ -11,9 +11,9 @@ use crossterm::style::Stylize;
 use path::PathInfo;
 
 use crate::{
-    global::{config, paths},
+    config,
     module::Module,
-    out,
+    out, paths,
     source::{Source, name::SourceName},
     utils::output::PathExt,
 };

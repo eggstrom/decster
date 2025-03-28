@@ -8,8 +8,7 @@ use bincode::{Decode, Encode};
 use crossterm::style::Stylize;
 
 use crate::{
-    global::config,
-    out,
+    config, out,
     utils::{self, fs::Sha256Hash, output::PathExt},
 };
 

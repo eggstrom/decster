@@ -1,13 +1,14 @@
 use std::{
     borrow::Cow,
     path::{Path, PathBuf},
+    sync::OnceLock,
 };
 
 use anyhow::{Result, anyhow};
 
 const APP_NAME: &str = "decster";
 
-pub(super) struct Paths {
+struct Paths {
     pub home: PathBuf,
     pub config: PathBuf,
     pub data: PathBuf,
@@ -37,8 +38,20 @@ impl Paths {
     }
 }
 
+static PATHS: OnceLock<Paths> = OnceLock::new();
+
+pub fn load() -> Result<()> {
+    PATHS
+        .set(Paths::new()?)
+        .ok()
+        .expect("`paths::load` should only be called once");
+    Ok(())
+}
+
 fn paths() -> &'static Paths {
-    &super::state().paths
+    PATHS
+        .get()
+        .expect("`paths::load` should be called without failing before other functions in `paths` are called")
 }
 
 pub fn home() -> &'static Path {

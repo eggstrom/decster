@@ -1,16 +1,17 @@
 use std::{
     collections::{BTreeMap, HashSet},
-    path::PathBuf,
+    fs,
+    path::{Path, PathBuf},
 };
 
+use anyhow::Result;
 use crossterm::style::Stylize;
 use itertools::Itertools;
 use link::ModuleLink;
 use serde::Deserialize;
 
 use crate::{
-    global::config,
-    out,
+    config, out,
     source::{name::SourceName, path::SourcePath},
     state::State,
 };
@@ -32,6 +33,14 @@ pub struct Module {
 }
 
 impl Module {
+    pub fn parse<P>(path: P) -> Result<Self>
+    where
+        P: AsRef<Path>,
+    {
+        let path = path.as_ref();
+        Ok(toml::from_str(&fs::read_to_string(path)?)?)
+    }
+
     pub fn files(&self) -> impl ExactSizeIterator<Item = ModuleLink> {
         self.files
             .iter()

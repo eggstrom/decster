@@ -6,8 +6,7 @@ use crossterm::style::Stylize;
 
 use crate::{
     cli::{Cli, Command, InfoArgs},
-    global::{self, config},
-    out,
+    config, out, paths,
     state::State,
     utils::output::PathExt,
 };
@@ -19,7 +18,8 @@ pub struct App {
 impl App {
     pub fn run() -> Result<()> {
         let cli = Cli::parse();
-        global::init(&cli)?;
+        paths::load()?;
+        config::load(&cli)?;
         let app = App {
             state: State::load()?,
         };

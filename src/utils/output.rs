@@ -5,7 +5,7 @@ use std::{
 
 use crossterm::style::Stylize;
 
-use crate::{global::paths, state::path::PathKind};
+use crate::{paths, state::path::PathKind};
 
 #[macro_export]
 macro_rules! out {

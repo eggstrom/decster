@@ -10,8 +10,7 @@ use std::{
 use crossterm::style::Stylize;
 
 use crate::{
-    global::{config, paths},
-    out,
+    config, out, paths,
     source::path::SourcePath,
     state::{
         State,
@@ -34,31 +33,32 @@ impl<'a> ModuleLink<'a> {
     where
         F: FnMut(&mut State, &Path, &Path) -> io::Result<()>,
     {
-        let _ = utils::fs::walk_dir_with_rel(self.source.path(), false, |path, rel_path| {
-            let mut new_path = paths::untildefy(self.path);
-            if rel_path.parent().is_some() {
-                new_path = Cow::Owned(new_path.join(rel_path));
-            }
+        let _: Result<_, ()> =
+            utils::fs::walk_dir_with_rel(self.source.path(), false, |path, rel_path| {
+                let mut new_path = paths::untildefy(self.path);
+                if rel_path.parent().is_some() {
+                    new_path = Cow::Owned(new_path.join(rel_path));
+                }
 
-            let kind = if path.is_dir() {
-                PathKind::Directory
-            } else {
-                PathKind::File
-            };
+                let kind = if path.is_dir() {
+                    PathKind::Directory
+                } else {
+                    PathKind::File
+                };
 
-            if state.has_path(&new_path) {
-                out!(2, failed, "{} (Path is used)", new_path.display_kind(kind));
-            } else if let Err(err) = if path.is_dir() {
-                state.create_dir(name, &new_path)
-            } else {
-                f(state, path, &new_path)
-            } {
-                out!(2, failed, "{} ({err})", new_path.display_kind(kind));
-            } else {
-                out!(2, created, "{}", new_path.display_kind(kind));
-            }
-            Ok(())
-        });
+                if state.has_path(&new_path) {
+                    out!(2, failed, "{} (Path is used)", new_path.display_kind(kind));
+                } else if let Err(err) = if let PathKind::Directory = kind {
+                    state.create_dir(name, &new_path)
+                } else {
+                    f(state, path, &new_path)
+                } {
+                    out!(2, failed, "{} ({err})", new_path.display_kind(kind));
+                } else {
+                    out!(2, created, "{}", new_path.display_kind(kind));
+                }
+                Ok(())
+            });
     }
 
     pub fn create_files(&self, state: &mut State, module: &str) {

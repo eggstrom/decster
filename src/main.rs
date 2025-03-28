@@ -5,8 +5,9 @@ use crossterm::style::Stylize;
 
 mod app;
 mod cli;
-mod global;
+mod config;
 mod module;
+mod paths;
 mod source;
 mod state;
 mod utils;

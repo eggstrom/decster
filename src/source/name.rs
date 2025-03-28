@@ -10,7 +10,7 @@ use crossterm::style::Stylize;
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::global::paths;
+use crate::paths;
 
 #[derive(Clone, Debug, Decode, Deserialize, Encode, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SourceName(String);
