@@ -9,7 +9,7 @@ use crate::{global::paths, state::path::PathKind};
 
 #[macro_export]
 macro_rules! out {
-    ($indent:expr, added, $($args:tt)*) => { out!($indent, "Added: ".green(), $($args)*) };
+    ($indent:expr, fetched, $($args:tt)*) => { out!($indent, "Fetched: ".green(), $($args)*) };
     ($indent:expr, created, $($args:tt)*) => { out!($indent, "Created: ".green(), $($args)*) };
     ($indent:expr, removed, $($args:tt)*) => { out!($indent, "Removed: ".green(), $($args)*) };
     ($indent:expr, skipped, $($args:tt)*) => { out!($indent, "Skipped: ".yellow(), $($args)*) };

@@ -57,15 +57,19 @@ impl Module {
             .map(|source| &source.name)
     }
 
-    pub fn add_sources(&self, state: &mut State) {
+    pub fn fetch_sources(&self, state: &mut State) {
         let sources = self.sources();
         if sources.size_hint().0 > 0 {
-            out!(1, "", "Adding sources");
+            out!(1, "", "Fetching sources");
             for name in self.sources() {
                 if let Some(source) = config::source(name) {
-                    match state.add_source(name, source) {
-                        Ok(_) => out!(2, added, "{name} ({source})"),
-                        Err(err) => out!(2, failed, "{name} ({err})"),
+                    if state.has_source(name, source) {
+                        out!(2, skipped, "{name} (Already fetched)");
+                    } else {
+                        match state.fetch_source(name, source) {
+                            Ok(_) => out!(2, fetched, "{name} ({source})"),
+                            Err(err) => out!(2, failed, "{name} ({err})"),
+                        }
                     }
                 } else {
                     out!(2, failed, "{} (Source isn't defined)", name.magenta());

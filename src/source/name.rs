@@ -1,16 +1,25 @@
 use std::{
     fmt::{self, Display, Formatter},
     ops::Deref,
-    path::Path,
+    path::{Path, PathBuf},
     str::FromStr,
 };
 
+use bincode::{Decode, Encode};
 use crossterm::style::Stylize;
 use serde::Deserialize;
 use thiserror::Error;
 
-#[derive(Debug, Deserialize, Eq, Hash, PartialEq)]
+use crate::global::paths;
+
+#[derive(Clone, Debug, Decode, Deserialize, Encode, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SourceName(String);
+
+impl SourceName {
+    pub fn path(&self) -> PathBuf {
+        paths::sources().join(self)
+    }
+}
 
 impl Deref for SourceName {
     type Target = str;

@@ -46,7 +46,7 @@ impl<'a> ModuleLink<'a> {
                 PathKind::File
             };
 
-            if state.is_path_used(&new_path) {
+            if state.has_path(&new_path) {
                 out!(2, failed, "{} (Path is used)", new_path.display_kind(kind))
             } else {
                 if let Err(err) = if path.is_dir() {

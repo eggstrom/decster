@@ -15,13 +15,14 @@ use crate::{
     module::Module,
     out,
     source::{Source, name::SourceName},
-    utils::{self, output::PathExt},
+    utils::output::PathExt,
 };
 
 pub mod path;
 
 #[derive(Decode, Default, Encode)]
 pub struct State {
+    sources: BTreeMap<SourceName, Source>,
     module_paths: BTreeMap<String, Vec<(PathBuf, PathInfo)>>,
     paths: HashSet<PathBuf>,
 }
@@ -46,36 +47,25 @@ impl State {
         bincode::config::standard()
     }
 
-    pub fn is_module_enabled(&self, module: &str) -> bool {
+    pub fn has_source(&self, name: &SourceName, source: &Source) -> bool {
+        self.sources.get(name).is_some_and(|s| s == source) && name.path().exists()
+    }
+
+    pub fn has_module(&self, module: &str) -> bool {
         self.module_paths.get(module).is_some()
     }
 
-    pub fn is_path_used<P>(&self, path: P) -> bool
+    pub fn has_path<P>(&self, path: P) -> bool
     where
         P: AsRef<Path>,
     {
         self.paths.contains(path.as_ref())
     }
 
-    pub fn add_source(&self, name: &SourceName, source: &Source) -> io::Result<()> {
-        let source_path = paths::sources().join(name);
-        if source_path.exists() {
-            utils::fs::remove_all(&source_path)?;
-        }
-
-        match source {
-            Source::Text(text) => self.add_text_source(&source_path, text)?,
-            Source::Path(path) => self.add_path_source(&source_path, path)?,
-        }
+    pub fn fetch_source(&mut self, name: &SourceName, source: &Source) -> io::Result<()> {
+        source.fetch(name)?;
+        self.sources.insert(name.clone(), source.clone());
         Ok(())
-    }
-
-    fn add_text_source(&self, source_path: &Path, text: &str) -> io::Result<()> {
-        fs::write(&source_path, text)
-    }
-
-    fn add_path_source(&self, source_path: &Path, path: &Path) -> io::Result<()> {
-        utils::fs::copy_all(path, &source_path)
     }
 
     pub fn add_path(&mut self, module: &str, path: &Path, info: PathInfo) {
@@ -96,8 +86,11 @@ impl State {
         Ok(())
     }
 
-    /// Returns a list of module names, definitions, and owned paths, based on
-    /// the provided filter.
+    /// Returns a list of module names, definitions, and owned paths.
+    ///
+    /// If `modules` isn't empty, all modules not in `modules` will be filtered
+    /// out. `filter` determines whether to look for all modules, enabled
+    /// modules, or disabled modules.
     pub fn modules(
         &self,
         modules: HashSet<String>,
@@ -116,7 +109,7 @@ impl State {
     }
 
     pub fn enable_module(&mut self, name: &str) {
-        if self.is_module_enabled(name) {
+        if self.has_module(name) {
             out!(0, "", "Module {} isn't disabled", name.magenta());
         } else if let Some(module) = config::module(name) {
             self.enable_module_inner(name, module);
@@ -128,7 +121,7 @@ impl State {
     pub fn enable_all_modules(&mut self) {
         let mut has_enabled = false;
         for (name, module) in config::modules() {
-            if !self.is_module_enabled(name) {
+            if !self.has_module(name) {
                 self.enable_module_inner(name, module);
                 has_enabled = true;
             }
@@ -140,7 +133,7 @@ impl State {
 
     fn enable_module_inner(&mut self, name: &str, module: &Module) {
         out!(0, "", "Enabling module {}", name.magenta());
-        module.add_sources(self);
+        module.fetch_sources(self);
         module.create_files(self, name);
         module.create_hard_links(self, name);
         module.create_symlinks(self, name);
