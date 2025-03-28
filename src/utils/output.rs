@@ -5,7 +5,7 @@ use std::{
 
 use crossterm::style::Stylize;
 
-use crate::global::paths;
+use crate::{global::paths, state::path::PathKind};
 
 #[macro_export]
 macro_rules! out {
@@ -16,17 +16,9 @@ macro_rules! out {
     }
 }
 
-pub trait Pretty {
-    type Target<'a>: Display
-    where
-        Self: 'a;
+pub struct DisplayFile<'a>(&'a Path);
 
-    fn pretty(&self) -> Self::Target<'_>;
-}
-
-pub struct PrettyPath<'a>(&'a Path);
-
-impl Display for PrettyPath<'_> {
+impl Display for DisplayFile<'_> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         if let Some(file) = self.0.file_name() {
             if let Some(path) = self.0.parent() {
@@ -38,16 +30,44 @@ impl Display for PrettyPath<'_> {
     }
 }
 
-impl<T> Pretty for T
-where
-    T: AsRef<Path>,
-{
-    type Target<'a>
-        = PrettyPath<'a>
-    where
-        Self: 'a;
+pub struct DisplayDir<'a>(&'a Path);
 
-    fn pretty(&self) -> Self::Target<'_> {
-        PrettyPath(self.as_ref())
+impl Display for DisplayDir<'_> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}{}", self.0.display_file(), "/".magenta())
+    }
+}
+
+pub struct DisplayKind<'a> {
+    path: &'a Path,
+    kind: PathKind,
+}
+
+impl Display for DisplayKind<'_> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self.kind {
+            PathKind::Directory => self.path.display_dir().fmt(f),
+            _ => self.path.display_file().fmt(f),
+        }
+    }
+}
+
+pub trait PathExt {
+    fn display_file(&self) -> DisplayFile;
+    fn display_dir(&self) -> DisplayDir;
+    fn display_kind(&self, kind: PathKind) -> DisplayKind;
+}
+
+impl PathExt for Path {
+    fn display_file(&self) -> DisplayFile {
+        DisplayFile(self)
+    }
+
+    fn display_dir(&self) -> DisplayDir {
+        DisplayDir(self)
+    }
+
+    fn display_kind(&self, kind: PathKind) -> DisplayKind {
+        DisplayKind { path: self, kind }
     }
 }

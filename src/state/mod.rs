@@ -8,17 +8,17 @@ use std::{
 use anyhow::{Context, Result};
 use bincode::{Decode, Encode, config::Configuration};
 use crossterm::style::Stylize;
-use path_info::PathInfo;
+use path::PathInfo;
 
 use crate::{
     global::{config, paths},
     module::Module,
     out,
     source::{Source, name::SourceName},
-    utils::{self, output::Pretty},
+    utils::{self, output::PathExt},
 };
 
-pub mod path_info;
+pub mod path;
 
 #[derive(Decode, Default, Encode)]
 pub struct State {
@@ -29,7 +29,7 @@ pub struct State {
 impl State {
     pub fn load() -> Result<Self> {
         fs::create_dir_all(paths::sources())
-            .with_context(|| format!("Couldn't create path: {}", paths::sources().pretty()))?;
+            .with_context(|| format!("Couldn't create path: {}", paths::sources().display_dir()))?;
         Ok(File::open(paths::state())
             .ok()
             .and_then(|mut file| bincode::decode_from_std_read(&mut file, Self::bin_config()).ok())
@@ -173,11 +173,10 @@ impl State {
         // Paths are removed in reverse order to make sure directories are
         // removed last.
         for (path, info) in paths.into_iter().rev() {
-            if let Err(err) = info.remove_if_owned(&path) {
-                out!("{} {} ({err})", "Failed:".red(), path.pretty());
-                unremovable_paths.push((path, info));
-            } else {
+            if info.remove_if_owned(&path) {
                 self.paths.remove(&path);
+            } else {
+                unremovable_paths.push((path, info));
             }
         }
 

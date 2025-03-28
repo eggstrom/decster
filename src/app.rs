@@ -9,7 +9,7 @@ use crate::{
     global::{self, config},
     out,
     state::State,
-    utils::output::Pretty,
+    utils::output::PathExt,
 };
 
 pub struct App {
@@ -56,8 +56,8 @@ impl App {
 
             if let Some(paths) = paths {
                 out!("  Owned paths");
-                for (path, _) in paths {
-                    out!("    {}", path.pretty())
+                for (path, info) in paths {
+                    out!("    {}", path.display_kind(info.kind()))
                 }
             }
         }

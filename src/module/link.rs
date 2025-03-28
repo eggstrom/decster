@@ -13,8 +13,11 @@ use crate::{
     global::{config, paths},
     out,
     source::path::SourcePath,
-    state::{State, path_info::PathInfo},
-    utils::{self, output::Pretty},
+    state::{
+        State,
+        path::{PathInfo, PathKind},
+    },
+    utils::{self, output::PathExt},
 };
 
 pub struct ModuleLink<'a> {
@@ -37,11 +40,17 @@ impl<'a> ModuleLink<'a> {
                 new_path = Cow::Owned(new_path.join(rel_path));
             }
 
+            let kind = if path.is_dir() {
+                PathKind::Directory
+            } else {
+                PathKind::File
+            };
+
             if state.is_path_used(&new_path) {
                 out!(
                     "    {} {} (Path is in use)",
                     "Failed:".red(),
-                    new_path.pretty()
+                    new_path.display_kind(kind)
                 )
             } else {
                 if let Err(err) = if path.is_dir() {
@@ -49,9 +58,13 @@ impl<'a> ModuleLink<'a> {
                 } else {
                     f(state, path, &new_path)
                 } {
-                    out!("    {} {} ({err})", "Failed:".red(), new_path.pretty())
+                    out!(
+                        "    {} {} ({err})",
+                        "Failed:".red(),
+                        new_path.display_kind(kind)
+                    )
                 } else {
-                    out!("    {} {}", "Created:".green(), new_path.pretty());
+                    out!("    {} {}", "Created:".green(), new_path.display_kind(kind));
                 }
             }
             Ok(())
@@ -60,7 +73,7 @@ impl<'a> ModuleLink<'a> {
 
     pub fn create_files(&self, state: &mut State, module: &str) {
         self.create_with(state, module, |state, from, to| {
-            let size = from.metadata()?.size();
+            let size = from.symlink_metadata()?.size();
             let hash = utils::fs::hash_file(from)?;
             io::copy(&mut File::open(from)?, &mut File::create_new(to)?)?;
             state.add_path(module, to, PathInfo::File { size, hash });
@@ -70,7 +83,7 @@ impl<'a> ModuleLink<'a> {
 
     pub fn create_hard_links(&self, state: &mut State, module: &str) {
         self.create_with(state, module, |state, original, link| {
-            let size = original.metadata()?.size();
+            let size = original.symlink_metadata()?.size();
             let hash = utils::fs::hash_file(original)?;
             fs::hard_link(original, link)?;
             state.add_path(module, link, PathInfo::HardLink { size, hash });
@@ -81,8 +94,8 @@ impl<'a> ModuleLink<'a> {
     pub fn create_symlinks(&self, state: &mut State, module: &str) {
         self.create_with(state, module, |state, original, link| {
             unix::fs::symlink(original, link)?;
-            let path = original.to_path_buf();
-            state.add_path(module, link, PathInfo::Symlink { path });
+            let original = original.to_path_buf();
+            state.add_path(module, link, PathInfo::Symlink { original });
             Ok(())
         });
     }
@@ -90,9 +103,9 @@ impl<'a> ModuleLink<'a> {
 
 impl Display for ModuleLink<'_> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{} -> {}", self.path.pretty(), self.source.name)?;
+        write!(f, "{} -> {}", self.path.display_file(), self.source.name)?;
         if let Some(source_path) = &self.source.path {
-            source_path.pretty().fmt(f)?;
+            source_path.display_file().fmt(f)?;
         }
         Ok(())
     }
