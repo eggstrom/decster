@@ -4,6 +4,7 @@ use std::{
 };
 
 use crossterm::style::Stylize;
+use itertools::Itertools;
 use link::ModuleLink;
 use serde::Deserialize;
 
@@ -55,6 +56,8 @@ impl Module {
             .chain(self.hard_links.values())
             .chain(self.symlinks.values())
             .map(|source| &source.name)
+            .unique()
+            .sorted()
     }
 
     pub fn fetch_sources(&self, state: &mut State) {
