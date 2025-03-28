@@ -45,8 +45,8 @@ impl Source {
 impl Display for Source {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            Source::Text(_) => "text",
-            Source::Path(_) => "path",
+            Source::Text(_) => "Text",
+            Source::Path(_) => "Path",
         }
         .fmt(f)
     }

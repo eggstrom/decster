@@ -43,16 +43,20 @@ fn config() -> &'static Config {
     &super::state().config
 }
 
-pub fn quiet() -> bool {
-    config().behavior.quiet
+pub fn fetch() -> bool {
+    config().behavior.fetch
+}
+
+pub fn overwrite() -> bool {
+    config().behavior.overwrite
 }
 
 pub fn dry_run() -> bool {
     config().behavior.dry_run
 }
 
-pub fn force() -> bool {
-    config().behavior.force
+pub fn quiet() -> bool {
+    config().behavior.quiet
 }
 
 pub fn source(name: &SourceName) -> Option<&'static Source> {

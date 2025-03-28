@@ -63,7 +63,7 @@ impl Module {
             out!(1, "", "Fetching sources");
             for name in self.sources() {
                 if let Some(source) = config::source(name) {
-                    if state.has_source(name, source) {
+                    if !config::fetch() && state.has_source(name, source) {
                         out!(2, skipped, "{name} (Already fetched)");
                     } else {
                         match state.fetch_source(name, source) {
