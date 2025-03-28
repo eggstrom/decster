@@ -18,7 +18,7 @@ use crate::{
 
 pub mod link;
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Module {
     #[serde(default)]

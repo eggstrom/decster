@@ -17,7 +17,7 @@ use crate::{
     utils,
 };
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub(super) struct Config {
     #[serde(skip)]

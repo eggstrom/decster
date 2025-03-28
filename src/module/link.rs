@@ -1,8 +1,7 @@
 use std::{
     borrow::Cow,
     fmt::{self, Display, Formatter},
-    fs::{self, File},
-    io,
+    fs, io,
     os::unix::{self, fs::MetadataExt},
     path::Path,
 };
@@ -65,7 +64,7 @@ impl<'a> ModuleLink<'a> {
         self.create_with(state, module, |state, from, to| {
             let size = from.symlink_metadata()?.size();
             let hash = utils::fs::hash_file(from)?;
-            io::copy(&mut File::open(from)?, &mut File::create_new(to)?)?;
+            utils::fs::copy(from, to)?;
             state.add_path(module, to, PathInfo::File { size, hash });
             Ok(())
         });

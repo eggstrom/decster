@@ -1,6 +1,7 @@
 use std::{
     fs::{self, File},
     io,
+    os::unix,
     path::{Path, PathBuf},
 };
 
@@ -46,6 +47,22 @@ where
     })
 }
 
+/// Copies a file without following symlinks.
+pub fn copy<P, Q>(from: P, to: Q) -> io::Result<()>
+where
+    P: AsRef<Path>,
+    Q: AsRef<Path>,
+{
+    let (from, to) = (from.as_ref(), to.as_ref());
+    if from.is_symlink() {
+        unix::fs::symlink(from.read_link()?, to)?;
+    } else {
+        // `fs::copy` isn't used because it overwrites files.
+        io::copy(&mut File::open(from)?, &mut File::create_new(to)?)?;
+    }
+    Ok(())
+}
+
 /// Recursively copies the contents of a directory.
 pub fn copy_all<P, Q>(from: P, to: Q) -> io::Result<()>
 where
@@ -54,22 +71,20 @@ where
 {
     let (from, to) = (from.as_ref(), to.as_ref());
     if !from.is_dir() {
-        fs::copy(from, to)?;
-        return Ok(());
+        copy(from, to)
+    } else {
+        walk_dir_with_rel(from, false, |path, rel_path| {
+            let to = to.join(rel_path);
+            if path.is_dir() {
+                fs::create_dir(to)
+            } else {
+                copy(path, to)
+            }
+        })
     }
-
-    walk_dir_with_rel(from, false, |path, rel_path| {
-        let to = to.join(rel_path);
-        if path.is_dir() {
-            fs::create_dir(&to)?;
-        } else {
-            fs::copy(path, &to)?;
-        }
-        Ok(())
-    })
 }
 
-/// Recursively removes `path` if it exists.
+/// Recursively removes a file or directory.
 pub fn remove_all<P>(path: P) -> io::Result<()>
 where
     P: AsRef<Path>,
