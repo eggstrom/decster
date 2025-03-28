@@ -67,7 +67,7 @@ const TILDE: &str = "~";
 /// a tilde.
 ///
 /// The home directory is determined using `home`.
-fn tildefy_with<'a, P>(path: &'a Path, home: P) -> Cow<'a, Path>
+fn tildefy_with<P>(path: &Path, home: P) -> Cow<Path>
 where
     P: AsRef<Path>,
 {
@@ -93,7 +93,7 @@ pub fn tildefy(path: &Path) -> Cow<Path> {
 /// directory.
 ///
 /// The home directory is determined using `home`.
-fn untildefy_with<'a, P>(path: &'a Path, home: P) -> Cow<'a, Path>
+fn untildefy_with<P>(path: &Path, home: P) -> Cow<Path>
 where
     P: AsRef<Path>,
 {

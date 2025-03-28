@@ -34,11 +34,11 @@ impl Source {
     }
 
     fn fetch_text(&self, source_path: &Path, text: &str) -> io::Result<()> {
-        fs::write(&source_path, text)
+        fs::write(source_path, text)
     }
 
     fn fetch_path(&self, source_path: &Path, path: &Path) -> io::Result<()> {
-        utils::fs::copy_all(path, &source_path)
+        utils::fs::copy_all(path, source_path)
     }
 }
 

@@ -36,7 +36,7 @@ impl<'a> ModuleLink<'a> {
     {
         let _ = utils::fs::walk_dir_with_rel(self.source.path(), false, |path, rel_path| {
             let mut new_path = paths::untildefy(self.path);
-            if let Some(_) = rel_path.parent() {
+            if rel_path.parent().is_some() {
                 new_path = Cow::Owned(new_path.join(rel_path));
             }
 
@@ -47,17 +47,15 @@ impl<'a> ModuleLink<'a> {
             };
 
             if state.has_path(&new_path) {
-                out!(2, failed, "{} (Path is used)", new_path.display_kind(kind))
+                out!(2, failed, "{} (Path is used)", new_path.display_kind(kind));
+            } else if let Err(err) = if path.is_dir() {
+                state.create_dir(name, &new_path)
             } else {
-                if let Err(err) = if path.is_dir() {
-                    state.create_dir(name, &new_path)
-                } else {
-                    f(state, path, &new_path)
-                } {
-                    out!(2, failed, "{} ({err})", new_path.display_kind(kind))
-                } else {
-                    out!(2, created, "{}", new_path.display_kind(kind));
-                }
+                f(state, path, &new_path)
+            } {
+                out!(2, failed, "{} ({err})", new_path.display_kind(kind));
+            } else {
+                out!(2, created, "{}", new_path.display_kind(kind));
             }
             Ok(())
         });

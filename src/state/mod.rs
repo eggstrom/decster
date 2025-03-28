@@ -52,7 +52,7 @@ impl State {
     }
 
     pub fn has_module(&self, module: &str) -> bool {
-        self.module_paths.get(module).is_some()
+        self.module_paths.contains_key(module)
     }
 
     pub fn has_path<P>(&self, path: P) -> bool

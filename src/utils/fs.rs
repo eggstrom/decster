@@ -68,21 +68,6 @@ where
     })
 }
 
-/// Removes a directory and all it's parents until it finds a parent that's not
-/// an empty directory or that it can't delete.
-pub fn remove_dir_components<P>(path: P)
-where
-    P: AsRef<Path>,
-{
-    let mut path = Some(path.as_ref());
-    while let Some(parent) = path {
-        match fs::remove_dir(parent) {
-            Ok(()) => path = parent.parent(),
-            Err(_) => break,
-        }
-    }
-}
-
 /// Recursively removes `path` if it exists.
 pub fn remove_all<P>(path: P) -> io::Result<()>
 where
