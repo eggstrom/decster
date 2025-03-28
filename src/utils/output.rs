@@ -13,7 +13,6 @@ macro_rules! out {
     ($indent:expr, created, $($args:tt)*) => { out!($indent, "Created: ".green(), $($args)*) };
     ($indent:expr, removed, $($args:tt)*) => { out!($indent, "Removed: ".green(), $($args)*) };
     ($indent:expr, skipped, $($args:tt)*) => { out!($indent, "Skipped: ".yellow(), $($args)*) };
-    ($indent:expr, changed, $($args:tt)*) => { out!($indent, "Changed: ".yellow(), $($args)*) };
     ($indent:expr, failed, $($args:tt)*) => { out!($indent, "Failed: ".red(), $($args)*) };
     ($indent:expr, $msg:expr, $($args:tt)*) => {{
         if !config::quiet() {
