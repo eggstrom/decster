@@ -56,9 +56,6 @@ pub struct InfoArgs {
     /// Only show disabled modules
     #[arg(long, short = 'D')]
     pub disabled: bool,
-    /// Show owned files
-    #[arg(long, short)]
-    pub owned_files: bool,
 }
 
 impl InfoArgs {
