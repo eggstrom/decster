@@ -9,11 +9,19 @@ use crate::{global::paths, state::path::PathKind};
 
 #[macro_export]
 macro_rules! out {
-    ($($arg:expr),*) => {
+    ($indent:expr, added, $($args:tt)*) => { out!($indent, "Added: ".green(), $($args)*) };
+    ($indent:expr, created, $($args:tt)*) => { out!($indent, "Created: ".green(), $($args)*) };
+    ($indent:expr, removed, $($args:tt)*) => { out!($indent, "Removed: ".green(), $($args)*) };
+    ($indent:expr, skipped, $($args:tt)*) => { out!($indent, "Skipped: ".yellow(), $($args)*) };
+    ($indent:expr, changed, $($args:tt)*) => { out!($indent, "Changed: ".yellow(), $($args)*) };
+    ($indent:expr, failed, $($args:tt)*) => { out!($indent, "Failed: ".red(), $($args)*) };
+    ($indent:expr, $msg:expr, $($args:tt)*) => {{
         if !config::quiet() {
-            println!($($arg),*);
+            (0..$indent).for_each(|_| print!("  "));
+            print!("{}", $msg);
+            println!($($args)*);
         }
-    }
+    }};
 }
 
 pub struct DisplayFile<'a>(&'a Path);

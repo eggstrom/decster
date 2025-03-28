@@ -47,24 +47,16 @@ impl<'a> ModuleLink<'a> {
             };
 
             if state.is_path_used(&new_path) {
-                out!(
-                    "    {} {} (Path is in use)",
-                    "Failed:".red(),
-                    new_path.display_kind(kind)
-                )
+                out!(2, failed, "{} (Path is used)", new_path.display_kind(kind))
             } else {
                 if let Err(err) = if path.is_dir() {
                     state.create_dir(name, &new_path)
                 } else {
                     f(state, path, &new_path)
                 } {
-                    out!(
-                        "    {} {} ({err})",
-                        "Failed:".red(),
-                        new_path.display_kind(kind)
-                    )
+                    out!(2, failed, "{} ({err})", new_path.display_kind(kind))
                 } else {
-                    out!("    {} {}", "Created:".green(), new_path.display_kind(kind));
+                    out!(2, created, "{}", new_path.display_kind(kind));
                 }
             }
             Ok(())

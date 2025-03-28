@@ -60,19 +60,15 @@ impl Module {
     pub fn add_sources(&self, state: &mut State) {
         let sources = self.sources();
         if sources.size_hint().0 > 0 {
-            out!("  Adding sources");
+            out!(1, "", "Adding sources");
             for name in self.sources() {
                 if let Some(source) = config::source(name) {
                     match state.add_source(name, source) {
-                        Ok(_) => out!("    {} {name} ({source})", "Added:".green()),
-                        Err(err) => out!("    {} {name} ({err})", "Failed:".red()),
+                        Ok(_) => out!(2, added, "{name} ({source})"),
+                        Err(err) => out!(2, failed, "{name} ({err})"),
                     }
                 } else {
-                    out!(
-                        "{} {} (Source isn't defined)",
-                        "Failed:".red(),
-                        name.magenta()
-                    );
+                    out!(2, failed, "{} (Source isn't defined)", name.magenta());
                 }
             }
         }
@@ -81,7 +77,7 @@ impl Module {
     pub fn create_files(&self, state: &mut State, module: &str) {
         let files = self.files();
         if files.len() > 0 {
-            out!("  Creating files");
+            out!(1, "", "Creating files");
             for file in files {
                 file.create_files(state, module);
             }
@@ -91,7 +87,7 @@ impl Module {
     pub fn create_hard_links(&self, state: &mut State, module: &str) {
         let hard_links = self.hard_links();
         if hard_links.len() > 0 {
-            out!("  Creating hard links");
+            out!(1, "", "Creating hard links");
             for hard_link in hard_links {
                 hard_link.create_hard_links(state, module);
             }
@@ -101,7 +97,7 @@ impl Module {
     pub fn create_symlinks(&self, state: &mut State, module: &str) {
         let symlinks = self.symlinks();
         if symlinks.len() > 0 {
-            out!("  Creating symlinks");
+            out!(1, "", "Creating symlinks");
             for symlink in symlinks {
                 symlink.create_symlinks(state, module);
             }

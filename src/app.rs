@@ -36,28 +36,28 @@ impl App {
     fn info(self, args: InfoArgs) {
         let (modules, filter) = args.modules();
         for (name, module, paths) in self.state.modules(modules, filter) {
-            out!("Module {}", name.magenta());
+            out!(0, "", "Module {}", name.magenta());
             let files = module.files();
             let hard_links = module.hard_links();
             let symlinks = module.symlinks();
 
             if files.len() > 0 {
-                out!("  Files");
-                files.for_each(|link| out!("    {link}"));
+                out!(1, "", "Files");
+                files.for_each(|link| out!(2, "", "{link}"));
             }
             if hard_links.len() > 0 {
-                out!("  Hard link");
-                hard_links.for_each(|link| out!("    {link}"));
+                out!(1, "", "Hard links");
+                hard_links.for_each(|link| out!(2, "", "{link}"));
             }
             if symlinks.len() > 0 {
-                out!("  Symlinks");
-                symlinks.for_each(|link| out!("    {link}"));
+                out!(1, "", "Symlinks");
+                symlinks.for_each(|link| out!(2, "", "{link}"));
             }
 
             if let Some(paths) = paths {
-                out!("  Owned paths");
+                out!(1, "", "Owned paths");
                 for (path, info) in paths {
-                    out!("    {}", path.display_kind(info.kind()))
+                    out!(2, "", "{}", path.display_kind(info.kind()))
                 }
             }
         }
