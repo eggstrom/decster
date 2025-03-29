@@ -5,7 +5,7 @@ use std::{
     sync::OnceLock,
 };
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use crossterm::style::Stylize;
 use serde::Deserialize;
 
@@ -19,18 +19,18 @@ use crate::{
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub(super) struct Config {
+struct Config {
     #[serde(skip)]
-    pub behavior: Behavior,
+    behavior: Behavior,
 
     #[serde(default)]
-    pub sources: HashMap<SourceName, Source>,
+    sources: HashMap<SourceName, Source>,
     #[serde(default)]
-    pub modules: BTreeMap<String, Module>,
+    modules: BTreeMap<String, Module>,
 }
 
 impl Config {
-    pub fn load(cli: &Cli) -> Result<Self> {
+    fn load(cli: &Cli) -> Result<Self> {
         let config_dir = cli.config.as_deref().unwrap_or(paths::config());
         let mut config = Config::parse(config_dir.join("config.toml"))?;
         config.behavior = cli.behavior.clone();
@@ -43,7 +43,9 @@ impl Config {
         P: AsRef<Path>,
     {
         let path = path.as_ref();
-        Ok(toml::from_str(&fs::read_to_string(path)?)?)
+        let text = fs::read_to_string(path)
+            .with_context(|| format!("Couldn't read config at {}", path.display()))?;
+        Ok(toml::from_str(&text)?)
     }
 
     fn load_modules(&mut self, dir: &Path) -> Result<()> {

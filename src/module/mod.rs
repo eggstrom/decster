@@ -23,6 +23,8 @@ pub mod link;
 pub struct Module {
     #[serde(default)]
     import: HashSet<String>,
+    #[serde(default)]
+    pub user: Option<String>,
 
     #[serde(default)]
     files: BTreeMap<PathBuf, SourcePath>,
@@ -94,8 +96,8 @@ impl Module {
         let files = self.files();
         if files.len() > 0 {
             out!(1, "", "Creating files");
-            for file in files {
-                file.create_files(state, module);
+            for link in files {
+                link.create_files(state, module);
             }
         }
     }
@@ -104,8 +106,8 @@ impl Module {
         let hard_links = self.hard_links();
         if hard_links.len() > 0 {
             out!(1, "", "Creating hard links");
-            for hard_link in hard_links {
-                hard_link.create_hard_links(state, module);
+            for link in hard_links {
+                link.create_hard_links(state, module);
             }
         }
     }
@@ -114,8 +116,8 @@ impl Module {
         let symlinks = self.symlinks();
         if symlinks.len() > 0 {
             out!(1, "", "Creating symlinks");
-            for symlink in symlinks {
-                symlink.create_symlinks(state, module);
+            for link in symlinks {
+                link.create_symlinks(state, module);
             }
         }
     }

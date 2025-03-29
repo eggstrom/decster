@@ -15,6 +15,7 @@ use crate::{
     module::Module,
     out, paths,
     source::{Source, name::SourceName},
+    users::Users,
     utils::output::PathExt,
 };
 
@@ -78,12 +79,15 @@ impl State {
         }
     }
 
-    pub fn create_dir(&mut self, module: &str, path: &Path) -> io::Result<()> {
+    pub fn create_dir(&mut self, module: &str, path: &Path) {
         if !path.is_dir() {
-            fs::create_dir(path)?;
-            self.add_path(module, path, PathInfo::Directory);
+            if let Err(err) = fs::create_dir(path) {
+                out!(2, failed, "{} ({err})", path.display_dir());
+            } else {
+                self.add_path(module, path, PathInfo::Directory);
+                out!(2, created, "{}", path.display_dir());
+            }
         }
-        Ok(())
     }
 
     /// Returns a list of module names, definitions, and owned paths.
@@ -108,48 +112,65 @@ impl State {
             })
     }
 
-    pub fn enable_module(&mut self, name: &str) {
+    pub fn enable_module(&mut self, users: &mut Users, name: &str) {
         if self.has_module(name) {
-            out!(0, "", "Module {} isn't disabled", name.magenta());
+            out!(0, failed, "Module {} isn't disabled", name.magenta());
         } else if let Some(module) = config::module(name) {
-            self.enable_module_inner(name, module);
+            self.enable_module_inner(users, name, module);
         } else {
-            out!(0, "", "Module {} isn't defined", name.magenta());
+            out!(0, failed, "Module {} isn't defined", name.magenta());
         }
     }
 
-    pub fn enable_all_modules(&mut self) {
+    pub fn enable_all_modules(&mut self, users: &mut Users) {
         let mut has_enabled = false;
         for (name, module) in config::modules() {
             if !self.has_module(name) {
-                self.enable_module_inner(name, module);
+                self.enable_module_inner(users, name, module);
                 has_enabled = true;
             }
         }
         if !has_enabled {
-            out!(0, "", "There are no disabled modules");
+            out!(0, failed, "There are no disabled modules");
         }
     }
 
-    fn enable_module_inner(&mut self, name: &str, module: &Module) {
-        out!(0, "", "Enabling module {}", name.magenta());
+    fn enable_module_inner(&mut self, users: &mut Users, name: &str, module: &Module) {
+        out!(0, enabling, "Module {}", name.magenta());
         module.fetch_sources(self);
+
+        if let Some(user) = &module.user {
+            let user = user.as_str();
+            match users.become_user(user) {
+                Err(err) => {
+                    out!(1, failed, "Couldn't become {} ({err})", user.magenta());
+                    return;
+                }
+                Ok(true) => out!(1, "", "Became {}", user.magenta()),
+                Ok(false) => (),
+            }
+        }
+
         module.create_files(self, name);
         module.create_hard_links(self, name);
         module.create_symlinks(self, name);
+
+        if let Err(err) = users.become_default_user() {
+            out!(1, failed, "Couldn't become default user ({err})");
+        }
     }
 
     pub fn disable_module(&mut self, name: &str) {
         if let Some((module, paths)) = self.module_paths.remove_entry(name) {
             self.disable_module_inner(module, paths);
         } else {
-            out!(0, "", "Module {} isn't enabled", name.magenta());
+            out!(0, failed, "Module {} isn't enabled", name.magenta());
         }
     }
 
     pub fn disable_all_modules(&mut self) {
         if self.module_paths.is_empty() {
-            out!(0, "", "There are no enabled modules");
+            out!(0, failed, "There are no enabled modules");
         } else {
             for (module, paths) in mem::take(&mut self.module_paths) {
                 self.disable_module_inner(module, paths);
@@ -158,7 +179,7 @@ impl State {
     }
 
     fn disable_module_inner(&mut self, name: String, paths: Vec<(PathBuf, PathInfo)>) {
-        out!(0, "", "Disabling module {}", name.as_str().magenta());
+        out!(0, disabling, "Module {}", name.as_str().magenta());
         out!(1, "", "Removing owned paths");
         // Any paths that can't be removed will be put back into the state.
         let mut unremovable_paths = Vec::new();
@@ -179,26 +200,26 @@ impl State {
         }
     }
 
-    pub fn update_module(&mut self, name: &str) {
+    pub fn update_module(&mut self, users: &mut Users, name: &str) {
         if let Some((name_rc, paths)) = self.module_paths.remove_entry(name) {
             self.disable_module_inner(name_rc, paths);
             if let Some(module) = config::module(name) {
-                self.enable_module_inner(name, module);
+                self.enable_module_inner(users, name, module);
             }
         } else {
-            out!(0, "", "Module {} isn't enabled", name.magenta());
+            out!(0, failed, "Module {} isn't enabled", name.magenta());
         }
     }
 
-    pub fn update_all_modules(&mut self) {
+    pub fn update_all_modules(&mut self, users: &mut Users) {
         if self.module_paths.is_empty() {
-            out!(0, "", "There are no enabled modules");
+            out!(0, failed, "There are no enabled modules");
         } else {
             for (name, paths) in mem::take(&mut self.module_paths) {
                 let module = config::module(&name).map(|module| (name.to_string(), module));
                 self.disable_module_inner(name, paths);
                 if let Some((name, module)) = module {
-                    self.enable_module_inner(&name, module);
+                    self.enable_module_inner(users, &name, module);
                 }
             }
         }

@@ -42,7 +42,7 @@ where
         f(
             path.as_path(),
             path.strip_prefix(root)
-                .expect("paths should always be prefixed with the root while walking a directory"),
+                .expect("Paths should always be prefixed with the root while walking a directory"),
         )
     })
 }

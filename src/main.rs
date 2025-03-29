@@ -10,6 +10,7 @@ mod module;
 mod paths;
 mod source;
 mod state;
+mod users;
 mod utils;
 
 fn main() {

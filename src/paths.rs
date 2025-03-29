@@ -9,15 +9,15 @@ use anyhow::{Result, anyhow};
 const APP_NAME: &str = "decster";
 
 struct Paths {
-    pub home: PathBuf,
-    pub config: PathBuf,
-    pub data: PathBuf,
-    pub sources: PathBuf,
-    pub state: PathBuf,
+    home: PathBuf,
+    config: PathBuf,
+    data: PathBuf,
+    sources: PathBuf,
+    state: PathBuf,
 }
 
 impl Paths {
-    pub fn new() -> Result<Self> {
+    fn new() -> Result<Self> {
         let home = dirs::home_dir().ok_or(anyhow!("Couldn't determine path of home directory"))?;
         let config = dirs::config_dir()
             .map(|path| path.join(APP_NAME))

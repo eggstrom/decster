@@ -8,10 +8,12 @@ use crate::{
     cli::{Cli, Command, InfoArgs},
     config, out, paths,
     state::State,
+    users::Users,
     utils::output::PathExt,
 };
 
 pub struct App {
+    users: Users,
     state: State,
 }
 
@@ -21,6 +23,7 @@ impl App {
         paths::load()?;
         config::load(&cli)?;
         let app = App {
+            users: Users::new(),
             state: State::load()?,
         };
 
@@ -65,10 +68,10 @@ impl App {
 
     fn enable(mut self, modules: BTreeSet<String>) -> Result<()> {
         if modules.is_empty() {
-            self.state.enable_all_modules();
+            self.state.enable_all_modules(&mut self.users);
         } else {
             for module in modules {
-                self.state.enable_module(&module);
+                self.state.enable_module(&mut self.users, &module);
             }
         }
         self.state.save()
@@ -87,10 +90,10 @@ impl App {
 
     fn update(mut self, modules: BTreeSet<String>) -> Result<()> {
         if modules.is_empty() {
-            self.state.update_all_modules();
+            self.state.update_all_modules(&mut self.users);
         } else {
             for module in modules {
-                self.state.update_module(&module);
+                self.state.update_module(&mut self.users, &module);
             }
         }
         self.state.save()
