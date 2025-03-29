@@ -9,13 +9,10 @@ use crate::{paths, state::path::PathKind};
 
 #[macro_export]
 macro_rules! out {
-    ($indent:expr, enabling, $($args:tt)+) => { out!($indent, "Enabling: ".green(), $($args)+) };
-    ($indent:expr, disabling, $($args:tt)+) => { out!($indent, "Disabling: ".green(), $($args)+) };
-    ($indent:expr, fetched, $($args:tt)+) => { out!($indent, "Fetched: ".green(), $($args)+) };
-    ($indent:expr, created, $($args:tt)+) => { out!($indent, "Created: ".green(), $($args)+) };
-    ($indent:expr, removed, $($args:tt)+) => { out!($indent, "Removed: ".green(), $($args)+) };
-    ($indent:expr, skipped, $($args:tt)+) => { out!($indent, "Skipped: ".yellow(), $($args)+) };
-    ($indent:expr, failed, $($args:tt)+) => { out!($indent, "Failed: ".red(), $($args)+) };
+    ($indent:expr, n, $($args:tt)+) => { out!($indent, "", $($args)+) };
+    ($indent:expr, g, $($args:tt)+) => { out!($indent, "Success: ".green(), $($args)+) };
+    ($indent:expr, y, $($args:tt)+) => { out!($indent, "Skipped: ".yellow(), $($args)+) };
+    ($indent:expr, r, $($args:tt)+) => { out!($indent, "Failure: ".red(), $($args)+) };
     ($indent:expr, $msg:expr, $($args:tt)+) => {{
         if !config::quiet() {
             (0..$indent).for_each(|_| print!("  "));

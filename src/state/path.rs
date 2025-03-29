@@ -69,17 +69,17 @@ impl PathInfo {
                     PathKind::Directory => fs::remove_dir(path),
                     _ => fs::remove_file(path),
                 } {
-                    out!(2, failed, "{} ({err})", path.display_kind(kind));
+                    out!(2, r, "{} ({err})", path.display_kind(kind));
                     return false;
                 } else {
-                    out!(2, removed, "{}", path.display_kind(kind));
+                    out!(2, g, "{}", path.display_kind(kind));
                 }
             }
             PathState::Changed => {
-                out!(2, skipped, "{} (File changed)", path.display_kind(kind))
+                out!(2, y, "{} (File changed)", path.display_kind(kind))
             }
             PathState::Missing => {
-                out!(2, skipped, "{} (File missing)", path.display_kind(kind))
+                out!(2, y, "{} (File missing)", path.display_kind(kind))
             }
         }
         true

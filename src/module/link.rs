@@ -46,13 +46,13 @@ impl<'a> ModuleLink<'a> {
                 };
 
                 if state.has_path(&new_path) {
-                    out!(2, failed, "{} (Path is used)", new_path.display_kind(kind));
+                    out!(2, r, "{} (Path is used)", new_path.display_kind(kind));
                 } else if let PathKind::Directory = kind {
                     state.create_dir(name, &new_path);
                 } else if let Err(err) = f(state, path, &new_path) {
-                    out!(2, failed, "{} ({err})", new_path.display_kind(kind));
+                    out!(2, r, "{} ({err})", new_path.display_kind(kind));
                 } else {
-                    out!(2, created, "{}", new_path.display_kind(kind));
+                    out!(2, g, "{}", new_path.display_kind(kind));
                 }
                 Ok(())
             });

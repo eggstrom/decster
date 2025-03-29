@@ -82,10 +82,10 @@ impl State {
     pub fn create_dir(&mut self, module: &str, path: &Path) {
         if !path.is_dir() {
             if let Err(err) = fs::create_dir(path) {
-                out!(2, failed, "{} ({err})", path.display_dir());
+                out!(2, r, "{} ({err})", path.display_dir());
             } else {
                 self.add_path(module, path, PathInfo::Directory);
-                out!(2, created, "{}", path.display_dir());
+                out!(2, g, "{}", path.display_dir());
             }
         }
     }
@@ -114,11 +114,11 @@ impl State {
 
     pub fn enable_module(&mut self, users: &mut Users, name: &str) {
         if self.has_module(name) {
-            out!(0, failed, "Module {} isn't disabled", name.magenta());
+            out!(0, r, "Module {} isn't disabled", name.magenta());
         } else if let Some(module) = config::module(name) {
             self.enable_module_inner(users, name, module);
         } else {
-            out!(0, failed, "Module {} isn't defined", name.magenta());
+            out!(0, r, "Module {} isn't defined", name.magenta());
         }
     }
 
@@ -131,22 +131,22 @@ impl State {
             }
         }
         if !has_enabled {
-            out!(0, failed, "There are no disabled modules");
+            out!(0, r, "There are no disabled modules");
         }
     }
 
     fn enable_module_inner(&mut self, users: &mut Users, name: &str, module: &Module) {
-        out!(0, enabling, "Module {}", name.magenta());
+        out!(0, n, "Enabling module {}", name.magenta());
         module.fetch_sources(self);
 
         if let Some(user) = &module.user {
             let user = user.as_str();
             match users.become_user(user) {
                 Err(err) => {
-                    out!(1, failed, "Couldn't become {} ({err})", user.magenta());
+                    out!(1, r, "Couldn't switch to user {} ({err})", user.magenta());
                     return;
                 }
-                Ok(true) => out!(1, "", "Became {}", user.magenta()),
+                Ok(true) => out!(1, g, "Switched to user {}", user.magenta()),
                 Ok(false) => (),
             }
         }
@@ -156,7 +156,7 @@ impl State {
         module.create_symlinks(self, name);
 
         if let Err(err) = users.become_default_user() {
-            out!(1, failed, "Couldn't become default user ({err})");
+            out!(1, r, "Couldn't switch to default user ({err})");
         }
     }
 
@@ -164,13 +164,13 @@ impl State {
         if let Some((module, paths)) = self.module_paths.remove_entry(name) {
             self.disable_module_inner(module, paths);
         } else {
-            out!(0, failed, "Module {} isn't enabled", name.magenta());
+            out!(0, r, "Module {} isn't enabled", name.magenta());
         }
     }
 
     pub fn disable_all_modules(&mut self) {
         if self.module_paths.is_empty() {
-            out!(0, failed, "There are no enabled modules");
+            out!(0, r, "There are no enabled modules");
         } else {
             for (module, paths) in mem::take(&mut self.module_paths) {
                 self.disable_module_inner(module, paths);
@@ -179,8 +179,8 @@ impl State {
     }
 
     fn disable_module_inner(&mut self, name: String, paths: Vec<(PathBuf, PathInfo)>) {
-        out!(0, disabling, "Module {}", name.as_str().magenta());
-        out!(1, "", "Removing owned paths");
+        out!(0, n, "Disabling module {}", name.as_str().magenta());
+        out!(1, n, "Removing owned paths");
         // Any paths that can't be removed will be put back into the state.
         let mut unremovable_paths = Vec::new();
 
@@ -207,13 +207,13 @@ impl State {
                 self.enable_module_inner(users, name, module);
             }
         } else {
-            out!(0, failed, "Module {} isn't enabled", name.magenta());
+            out!(0, r, "Module {} isn't enabled", name.magenta());
         }
     }
 
     pub fn update_all_modules(&mut self, users: &mut Users) {
         if self.module_paths.is_empty() {
-            out!(0, failed, "There are no enabled modules");
+            out!(0, r, "There are no enabled modules");
         } else {
             for (name, paths) in mem::take(&mut self.module_paths) {
                 let module = config::module(&name).map(|module| (name.to_string(), module));
