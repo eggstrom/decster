@@ -58,7 +58,10 @@ impl Display for DisplayFile<'_> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         if let Some(file) = self.0.file_name() {
             if let Some(path) = self.0.parent() {
-                write!(f, "{}/", paths::tildefy(path).display())?;
+                paths::tildefy(path).display().fmt(f)?;
+                if path.parent().is_some() {
+                    "/".fmt(f)?;
+                }
             }
             file.to_string_lossy().magenta().fmt(f)?;
         }
