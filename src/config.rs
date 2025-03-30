@@ -35,6 +35,7 @@ impl Config {
         let mut config = Config::parse(config_dir.join("config.toml"))?;
         config.behavior = cli.behavior.clone();
         config.load_modules(&config_dir.join("modules"))?;
+        config.load_sources(&config_dir.join("sources"))?;
         Ok(config)
     }
 
@@ -58,12 +59,29 @@ impl Config {
             }
             if let Some(name) = rel_path.to_string_lossy().strip_suffix(".toml") {
                 let module = Module::parse(path)?;
-                if self.modules.insert(name.to_string(), module).is_some() {
+                if !self.modules.contains_key(name) {
+                    self.modules.insert(name.to_string(), module);
+                } else {
                     bail!("Module {} is defined twice", name.magenta());
                 }
             }
             Ok(())
         })?;
+        Ok(())
+    }
+
+    fn load_sources(&mut self, dir: &Path) -> Result<()> {
+        if !dir.is_dir() {
+            return Ok(());
+        }
+        for entry in fs::read_dir(dir)?.filter_map(Result::ok) {
+            let name = SourceName::from(entry.file_name());
+            if !self.sources.contains_key(&name) {
+                self.sources.insert(name, Source::Static);
+            } else {
+                bail!("Source {} is defined twice", name);
+            }
+        }
         Ok(())
     }
 }

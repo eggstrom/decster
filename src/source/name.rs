@@ -1,4 +1,5 @@
 use std::{
+    ffi::OsString,
     fmt::{self, Display, Formatter},
     ops::Deref,
     path::{Path, PathBuf},
@@ -19,6 +20,10 @@ impl SourceName {
     pub fn path(&self) -> PathBuf {
         paths::sources().join(self)
     }
+
+    pub fn static_path(&self) -> PathBuf {
+        paths::config().join("sources").join(self)
+    }
 }
 
 impl Deref for SourceName {
@@ -32,6 +37,12 @@ impl Deref for SourceName {
 impl AsRef<Path> for SourceName {
     fn as_ref(&self) -> &Path {
         Path::new(&self.0)
+    }
+}
+
+impl From<OsString> for SourceName {
+    fn from(value: OsString) -> Self {
+        SourceName(value.to_string_lossy().into_owned())
     }
 }
 

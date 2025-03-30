@@ -13,7 +13,7 @@ macro_rules! out_inner {
         #[allow(unused_imports)]
         use crossterm::{style::{Color, SetForegroundColor, Stylize}};
 
-        if !crate::config::quiet() {
+        if !$crate::config::quiet() {
             $crate::out_inner!(indent $indent);
             $crate::out_inner!(label $($color)?);
             print!($($msg),+);

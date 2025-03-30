@@ -16,18 +16,25 @@ pub mod path;
 #[derive(Clone, Debug, Decode, Deserialize, Encode, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Source {
+    #[serde(skip)]
+    Static,
     Text(String),
     Path(PathBuf),
 }
 
 impl Source {
     pub fn fetch(&self, name: &SourceName) -> io::Result<()> {
+        if let Source::Static = self {
+            return Ok(());
+        }
+
         let source_path = name.path();
         if source_path.exists() {
             utils::fs::remove_all(&source_path)?;
         }
 
         match self {
+            Source::Static => unreachable!(),
             Source::Text(text) => self.fetch_text(&source_path, text),
             Source::Path(path) => self.fetch_path(&source_path, path),
         }
@@ -45,6 +52,7 @@ impl Source {
 impl Display for Source {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
+            Source::Static => "Static",
             Source::Text(_) => "Text",
             Source::Path(_) => "Path",
         }

@@ -7,8 +7,8 @@ use std::{
 };
 
 use crate::{
-    out, paths,
-    source::path::SourcePath,
+    config, out, paths,
+    source::{Source, path::SourcePath},
     state::{
         State,
         path::{PathInfo, PathKind},
@@ -30,30 +30,38 @@ impl<'a> ModuleLink<'a> {
     where
         F: FnMut(&mut State, &Path, &Path) -> io::Result<()>,
     {
-        let _: Result<_, ()> =
-            utils::fs::walk_dir_with_rel(self.source.path(), false, |path, rel_path| {
-                let mut new_path = paths::untildefy(self.path);
-                if rel_path.parent().is_some() {
-                    new_path = Cow::Owned(new_path.join(rel_path));
-                }
+        let source_path = match config::source(&self.source.name) {
+            Some(Source::Static) => self.source.static_path(),
+            Some(_) => self.source.path(),
+            None => {
+                out!(2, R; "Source {} isn't defined", self.source.name);
+                return;
+            }
+        };
 
-                let kind = if path.is_dir() {
-                    PathKind::Directory
-                } else {
-                    PathKind::File
-                };
+        let _ = utils::fs::walk_dir_with_rel(source_path, false, |path, rel_path| {
+            let mut new_path = paths::untildefy(self.path);
+            if rel_path.parent().is_some() {
+                new_path = Cow::Owned(new_path.join(rel_path));
+            }
 
-                if state.has_path(&new_path) {
-                    out!(2, R; "{} (Path is used)", new_path.display_kind(kind));
-                } else if let PathKind::Directory = kind {
-                    state.create_dir(name, &new_path);
-                } else if let Err(err) = f(state, path, &new_path) {
-                    out!(2, R; "{}", new_path.display_kind(kind); "{err}");
-                } else {
-                    out!(2, G; "{}", new_path.display_kind(kind));
-                }
-                Ok(())
-            });
+            let kind = if path.is_dir() {
+                PathKind::Directory
+            } else {
+                PathKind::File
+            };
+
+            if state.has_path(&new_path) {
+                out!(2, R; "{} (Path is used)", new_path.display_kind(kind));
+            } else if let PathKind::Directory = kind {
+                state.create_dir(name, &new_path);
+            } else if let Err(err) = f(state, path, &new_path) {
+                out!(2, R; "{}", new_path.display_kind(kind); "{err}");
+            } else {
+                out!(2, G; "{}", new_path.display_kind(kind));
+            }
+            Ok::<_, ()>(())
+        });
     }
 
     pub fn create_files(&self, state: &mut State, module: &str) {
