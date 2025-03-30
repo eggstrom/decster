@@ -17,10 +17,10 @@ struct Paths {
 }
 
 impl Paths {
-    fn new() -> Result<Self> {
+    fn load(config_dir: Option<PathBuf>) -> Result<Self> {
         let home = dirs::home_dir().ok_or(anyhow!("Couldn't determine path of home directory"))?;
-        let config = dirs::config_dir()
-            .map(|path| path.join(APP_NAME))
+        let config = config_dir
+            .or(dirs::config_dir().map(|path| path.join(APP_NAME)))
             .ok_or(anyhow!("Couldn't determine path of config directory"))?;
         let data = dirs::data_dir()
             .map(|path| path.join(APP_NAME))
@@ -40,9 +40,9 @@ impl Paths {
 
 static PATHS: OnceLock<Paths> = OnceLock::new();
 
-pub fn load() -> Result<()> {
+pub fn load(config_dir: Option<PathBuf>) -> Result<()> {
     PATHS
-        .set(Paths::new()?)
+        .set(Paths::load(config_dir)?)
         .ok()
         .expect("`paths::load` should only be called once");
     Ok(())

@@ -10,7 +10,7 @@ use crossterm::style::Stylize;
 use serde::Deserialize;
 
 use crate::{
-    cli::{Behavior, Cli},
+    cli::Behavior,
     module::Module,
     paths,
     source::{Source, name::SourceName},
@@ -30,12 +30,11 @@ struct Config {
 }
 
 impl Config {
-    fn load(cli: &Cli) -> Result<Self> {
-        let config_dir = cli.config.as_deref().unwrap_or(paths::config());
-        let mut config = Config::parse(config_dir.join("config.toml"))?;
-        config.behavior = cli.behavior.clone();
-        config.load_modules(&config_dir.join("modules"))?;
-        config.load_sources(&config_dir.join("sources"))?;
+    fn load(behavior: Behavior) -> Result<Self> {
+        let mut config = Config::parse(paths::config().join("config.toml"))?;
+        config.behavior = behavior;
+        config.load_modules(&paths::config().join("modules"))?;
+        config.load_sources(&paths::config().join("sources"))?;
         Ok(config)
     }
 
@@ -88,10 +87,10 @@ impl Config {
 
 static CONFIG: OnceLock<Config> = OnceLock::new();
 
-pub fn load(cli: &Cli) -> Result<()> {
+pub fn load(behavior: Behavior) -> Result<()> {
     #[allow(clippy::ok_expect)] // The call to `ok` makes the output prettier.
     CONFIG
-        .set(Config::load(cli)?)
+        .set(Config::load(behavior)?)
         .ok()
         .expect("`config::load` should only be called once");
     Ok(())

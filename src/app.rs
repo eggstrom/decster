@@ -19,8 +19,8 @@ pub struct App {
 impl App {
     pub fn run() -> Result<()> {
         let cli = Cli::parse();
-        paths::load()?;
-        config::load(&cli)?;
+        paths::load(cli.config)?;
+        config::load(cli.behavior)?;
         let app = App {
             users: Users::new(),
             state: State::load()?,
