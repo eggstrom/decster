@@ -5,10 +5,9 @@ use std::{
 };
 
 use bincode::{Decode, Encode};
-use crossterm::style::Stylize;
 
 use crate::{
-    config, out,
+    out,
     utils::{self, fs::Sha256Hash, output::PathExt},
 };
 
@@ -69,17 +68,17 @@ impl PathInfo {
                     PathKind::Directory => fs::remove_dir(path),
                     _ => fs::remove_file(path),
                 } {
-                    out!(2, r, "{} ({err})", path.display_kind(kind));
+                    out!(2, R; "{}", path.display_kind(kind); "{err}");
                     return false;
                 } else {
-                    out!(2, g, "{}", path.display_kind(kind));
+                    out!(2, G; "{}", path.display_kind(kind));
                 }
             }
             PathState::Changed => {
-                out!(2, y, "{} (File changed)", path.display_kind(kind))
+                out!(2, Y; "{}", path.display_kind(kind); "File changed")
             }
             PathState::Missing => {
-                out!(2, y, "{} (File missing)", path.display_kind(kind))
+                out!(2, Y; "{}", path.display_kind(kind); "File missing")
             }
         }
         true

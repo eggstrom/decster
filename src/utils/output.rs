@@ -8,18 +8,48 @@ use crossterm::style::Stylize;
 use crate::{paths, state::path::PathKind};
 
 #[macro_export]
-macro_rules! out {
-    ($indent:expr, n, $($args:tt)+) => { out!($indent, "", $($args)+) };
-    ($indent:expr, g, $($args:tt)+) => { out!($indent, "Success: ".green(), $($args)+) };
-    ($indent:expr, y, $($args:tt)+) => { out!($indent, "Skipped: ".yellow(), $($args)+) };
-    ($indent:expr, r, $($args:tt)+) => { out!($indent, "Failure: ".red(), $($args)+) };
-    ($indent:expr, $msg:expr, $($args:tt)+) => {{
-        if !config::quiet() {
-            (0..$indent).for_each(|_| print!("  "));
-            print!("{}", $msg);
-            println!($($args)+);
+macro_rules! out_inner {
+    ($indent:expr $(, $color:ident)?; $($msg:expr),+ $(; $($info:expr),+)?) => {{
+        #[allow(unused_imports)]
+        use crossterm::{style::{Color, SetForegroundColor, Stylize}};
+
+        if !crate::config::quiet() {
+            $crate::out_inner!(indent $indent);
+            $crate::out_inner!(label $($color)?);
+            print!($($msg),+);
+            $crate::out_inner!(info $($color)? $(; $($info),+)?);
+            println!();
         }
     }};
+
+    (indent 0) => {};
+    (indent $indent:expr) => { (0_usize..$indent).for_each(|_| print!("  ")); };
+
+    (label) => {};
+    (label Green) => { print!("{} ", "Success:".green()); };
+    (label Yellow) => { print!("{} ", "Skipped:".yellow()); };
+    (label Red) => { print!("{} ", "Failure:".red()); };
+
+    (info) => {};
+    (info $color:ident) => {};
+    (info $($info:expr),+) => {
+        print!(" (");
+        print!($($info),+);
+        print!(")");
+    };
+    (info $color:ident; $($info:expr),+) => {
+        print!(" {}(", SetForegroundColor(Color::$color));
+        print!($($info),+);
+        print!("){}", SetForegroundColor(Color::Reset));
+    };
+}
+
+#[macro_export]
+macro_rules! out {
+    ($indent:expr;    $($msg:expr),+ $(; $($info:expr),+)?) => { $crate::out_inner!($indent;         $($msg),+ $(; $($info),+)?) };
+    ($indent:expr, G; $($msg:expr),+ $(; $($info:expr),+)?) => { $crate::out_inner!($indent, Green;  $($msg),+ $(; $($info),+)?) };
+    ($indent:expr, Y; $($msg:expr),+ $(; $($info:expr),+)?) => { $crate::out_inner!($indent, Yellow; $($msg),+ $(; $($info),+)?) };
+    ($indent:expr, R; $($msg:expr),+ $(; $($info:expr),+)?) => { $crate::out_inner!($indent, Red;    $($msg),+ $(; $($info),+)?) };
 }
 
 pub struct DisplayFile<'a>(&'a Path);

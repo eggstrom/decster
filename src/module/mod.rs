@@ -5,7 +5,6 @@ use std::{
 };
 
 use anyhow::Result;
-use crossterm::style::Stylize;
 use itertools::Itertools;
 use link::ModuleLink;
 use serde::Deserialize;
@@ -74,19 +73,19 @@ impl Module {
     pub fn fetch_sources(&self, state: &mut State) {
         let sources = self.sources();
         if sources.size_hint().0 > 0 {
-            out!(1, n, "Fetching sources");
+            out!(1; "Fetching sources");
             for name in self.sources() {
                 if let Some(source) = config::source(name) {
                     if !config::fetch() && state.has_source(name, source) {
-                        out!(2, y, "{name} (Already fetched)");
+                        out!(2, Y; "{name}"; "Already fetched");
                     } else {
                         match state.fetch_source(name, source) {
-                            Ok(_) => out!(2, g, "{name} ({source})"),
-                            Err(err) => out!(2, r, "{name} ({err})"),
+                            Ok(_) => out!(2, G; "{name}"; "{source}"),
+                            Err(err) => out!(2, R; "{name}"; "{err}"),
                         }
                     }
                 } else {
-                    out!(2, r, "{} (Source isn't defined)", name.magenta());
+                    out!(2, R; "{}", name.magenta(); "Source isn't defined");
                 }
             }
         }
@@ -95,7 +94,7 @@ impl Module {
     pub fn create_files(&self, state: &mut State, module: &str) {
         let files = self.files();
         if files.len() > 0 {
-            out!(1, n, "Creating files");
+            out!(1; "Creating files");
             for link in files {
                 link.create_files(state, module);
             }
@@ -105,7 +104,7 @@ impl Module {
     pub fn create_hard_links(&self, state: &mut State, module: &str) {
         let hard_links = self.hard_links();
         if hard_links.len() > 0 {
-            out!(1, n, "Creating hard links");
+            out!(1; "Creating hard links");
             for link in hard_links {
                 link.create_hard_links(state, module);
             }
@@ -115,7 +114,7 @@ impl Module {
     pub fn create_symlinks(&self, state: &mut State, module: &str) {
         let symlinks = self.symlinks();
         if symlinks.len() > 0 {
-            out!(1, n, "Creating symlinks");
+            out!(1; "Creating symlinks");
             for link in symlinks {
                 link.create_symlinks(state, module);
             }

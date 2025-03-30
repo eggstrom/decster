@@ -1,7 +1,6 @@
-use std::process;
-
 use app::App;
 use crossterm::style::Stylize;
+use std::process;
 
 mod app;
 mod cli;
