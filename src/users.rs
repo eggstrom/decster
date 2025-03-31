@@ -20,19 +20,25 @@ impl From<unistd::User> for User {
     }
 }
 
-pub struct Users(HashMap<String, Option<User>>);
+pub struct Users {
+    uid: Uid,
+    users: HashMap<String, Option<User>>,
+}
 
 impl Users {
     pub fn new() -> Self {
-        Users(HashMap::new())
+        Users {
+            uid: unistd::getuid(),
+            users: HashMap::new(),
+        }
     }
 
     fn user(&mut self, name: &str) -> Result<&User> {
-        if !self.0.contains_key(name) {
+        if !self.users.contains_key(name) {
             let user = unistd::User::from_name(name)?.map(|user| user.into());
-            self.0.insert(name.to_string(), user);
+            self.users.insert(name.to_string(), user);
         }
-        self.0
+        self.users
             .get(name)
             .expect("At this point, this entry should always exist")
             .as_ref()
@@ -45,5 +51,9 @@ impl Users {
 
     fn home(&mut self, name: &str) -> Result<&Path> {
         self.user(name).map(|user| user.home.as_path())
+    }
+
+    pub fn is_current(&mut self, name: &str) -> bool {
+        self.uid(name).is_ok_and(|uid| uid == self.uid)
     }
 }

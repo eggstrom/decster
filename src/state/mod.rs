@@ -144,9 +144,10 @@ impl State {
         module.create_symlinks(self, name);
 
         let uid = if let Some(user) = &module.user {
-            out!(1; "Changing file ownership");
+            if !users.is_current(user) {
+                out!(1; "Changing file ownership");
+            }
             match users.uid(&user) {
-                Ok(uid) if uid == unistd::getuid() => return,
                 Ok(uid) => uid,
                 Err(err) => {
                     out!(2, R; "Couldn't get {}'s UID", user.as_str().magenta(); "{err}");
