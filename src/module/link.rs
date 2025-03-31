@@ -52,7 +52,7 @@ impl<'a> ModuleLink<'a> {
             };
 
             if state.has_path(&new_path) {
-                out!(2, R; "{} (Path is used)", new_path.display_kind(kind));
+                out!(2, R; "{}", new_path.display_kind(kind); "Path is used");
             } else if let PathKind::Directory = kind {
                 state.create_dir(name, &new_path);
             } else if let Err(err) = f(state, path, &new_path) {

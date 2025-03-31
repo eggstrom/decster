@@ -2,11 +2,13 @@ use std::{
     collections::{BTreeMap, HashSet},
     fs::{self, File},
     io, mem,
+    os::unix,
     path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result};
 use bincode::{Decode, Encode, config::Configuration};
+use nix::unistd;
 use path::PathInfo;
 
 use crate::{
@@ -137,25 +139,32 @@ impl State {
     fn enable_module_inner(&mut self, users: &mut Users, name: &str, module: &Module) {
         out!(0; "Enabling module {}", name.magenta());
         module.fetch_sources(self);
-
-        if let Some(user) = &module.user {
-            let user = user.as_str();
-            match users.become_user(user) {
-                Err(err) => {
-                    out!(1, R; "Couldn't switch to user {}", user.magenta(); "{err}");
-                    return;
-                }
-                Ok(true) => out!(1, G; "Switched to user {}", user.magenta()),
-                Ok(false) => (),
-            }
-        }
-
         module.create_files(self, name);
         module.create_hard_links(self, name);
         module.create_symlinks(self, name);
 
-        if let Err(err) = users.become_default_user() {
-            out!(1, R; "Couldn't switch to default user"; "{err}");
+        let uid = if let Some(user) = &module.user {
+            out!(1; "Changing file ownership");
+            match users.uid(&user) {
+                Ok(uid) if uid == unistd::getuid() => return,
+                Ok(uid) => uid,
+                Err(err) => {
+                    out!(2, R; "Couldn't get {}'s UID", user.as_str().magenta(); "{err}");
+                    return;
+                }
+            }
+        } else {
+            return;
+        };
+
+        if let Some(module_paths) = self.module_paths.get(name) {
+            for (path, info) in module_paths {
+                let display = path.display_kind(info.kind());
+                match unix::fs::lchown(path, Some(uid.as_raw()), None) {
+                    Ok(()) => out!(2, G; "{display}"),
+                    Err(err) => out!(2, R; "{display}"; "{err}"),
+                }
+            }
         }
     }
 
