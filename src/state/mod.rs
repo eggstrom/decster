@@ -8,7 +8,6 @@ use std::{
 
 use anyhow::{Context, Result};
 use bincode::{Decode, Encode, config::Configuration};
-use nix::unistd;
 use path::PathInfo;
 
 use crate::{
@@ -147,7 +146,7 @@ impl State {
             if !users.is_current(user) {
                 out!(1; "Changing file ownership");
             }
-            match users.uid(&user) {
+            match users.uid(user) {
                 Ok(uid) => uid,
                 Err(err) => {
                     out!(2, R; "Couldn't get {}'s UID", user.as_str().magenta(); "{err}");
