@@ -1,4 +1,4 @@
-use std::{collections::HashSet, path::PathBuf};
+use std::{collections::HashSet, path::PathBuf, str::FromStr};
 
 use clap::{Args, Parser, Subcommand};
 
@@ -47,7 +47,10 @@ pub enum Command {
     Update { modules: Vec<String> },
     /// Show hashes of fetched sources
     #[command(alias = "h")]
-    Hash { sources: Vec<SourceName> },
+    Hash {
+        #[arg(value_parser = SourceName::from_str)]
+        sources: Vec<SourceName>,
+    },
 }
 
 #[derive(Args, Clone, Debug)]
