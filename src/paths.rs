@@ -11,8 +11,10 @@ const APP_NAME: &str = "decster";
 struct Paths {
     home: PathBuf,
     config: PathBuf,
-    data: PathBuf,
-    sources: PathBuf,
+    modules: PathBuf,
+    config_sources: PathBuf,
+    named_sources: PathBuf,
+    unnamed_sources: PathBuf,
     state: PathBuf,
 }
 
@@ -25,15 +27,15 @@ impl Paths {
         let data = dirs::data_dir()
             .map(|path| path.join(APP_NAME))
             .ok_or(anyhow!("Couldn't determine path of data directory"))?;
-        let sources = data.join("sources");
-        let state = data.join("state");
 
         Ok(Paths {
             home,
-            config,
-            data,
-            sources,
-            state,
+            config: config.join("config.toml"),
+            modules: config.join("modules"),
+            config_sources: config.join("sources"),
+            named_sources: data.join("named-sources"),
+            unnamed_sources: data.join("unnamed-sources"),
+            state: data.join("state"),
         })
     }
 }
@@ -62,12 +64,20 @@ pub fn config() -> &'static Path {
     &paths().config
 }
 
-pub fn data() -> &'static Path {
-    &paths().data
+pub fn modules() -> &'static Path {
+    &paths().modules
 }
 
-pub fn sources() -> &'static Path {
-    &paths().sources
+pub fn config_sources() -> &'static Path {
+    &paths().config_sources
+}
+
+pub fn named_sources() -> &'static Path {
+    &paths().named_sources
+}
+
+pub fn unnamed_sources() -> &'static Path {
+    &paths().unnamed_sources
 }
 
 pub fn state() -> &'static Path {

@@ -25,7 +25,7 @@ pub enum Source {
 
 impl Source {
     pub fn fetch(&self, name: &SourceName) -> io::Result<()> {
-        let source_path = name.path();
+        let source_path = name.named_path();
         if source_path.exists() || source_path.is_symlink() {
             utils::fs::remove_all(&source_path)?;
         }

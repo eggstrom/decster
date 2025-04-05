@@ -26,8 +26,8 @@ pub enum SourceDefinition {
 impl SourceDefinition {
     pub fn path(&self, name: &SourceName) -> PathBuf {
         match self {
-            SourceDefinition::Static => paths::config().join("sources").join(name),
-            SourceDefinition::Dynamic { .. } => paths::sources().join(name),
+            SourceDefinition::Static => paths::config_sources().join(name),
+            SourceDefinition::Dynamic { .. } => paths::named_sources().join(name),
         }
     }
 
@@ -51,7 +51,7 @@ impl SourceDefinition {
             return;
         };
         if let Some(hash) = hash {
-            if !name.path().hash_all().is_ok_and(|h| h == *hash) {
+            if !name.named_path().hash_all().is_ok_and(|h| h == *hash) {
                 out!(2, R; "{name}"; "Contents don't match hash");
                 return;
             }

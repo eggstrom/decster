@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, BTreeSet, HashSet},
+    collections::{BTreeMap, HashSet},
     fs::{self, File},
     mem,
     os::unix,
@@ -30,8 +30,9 @@ pub struct State {
 
 impl State {
     pub fn load() -> Result<Self> {
-        fs::create_dir_all(paths::sources())
-            .with_context(|| format!("Couldn't create path: {}", paths::sources().display_dir()))?;
+        let dir = paths::named_sources();
+        fs::create_dir_all(dir)
+            .with_context(|| format!("Couldn't create path: {}", dir.display_dir()))?;
         Ok(File::open(paths::state())
             .ok()
             .and_then(|mut file| bincode::decode_from_std_read(&mut file, Self::bin_config()).ok())
@@ -57,7 +58,7 @@ impl State {
     }
 
     pub fn has_source(&self, name: &SourceName, source: &SourceDefinition) -> bool {
-        self.sources.get(name).is_some_and(|s| s == source) && name.path().exists()
+        self.sources.get(name).is_some_and(|s| s == source) && name.named_path().exists()
     }
 
     pub fn has_module(&self, module: &str) -> bool {

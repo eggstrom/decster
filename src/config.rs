@@ -31,10 +31,10 @@ struct Config {
 
 impl Config {
     fn load(behavior: Behavior) -> Result<Self> {
-        let mut config = Config::parse(paths::config().join("config.toml"))?;
+        let mut config = Config::parse(paths::config())?;
         config.behavior = behavior;
-        config.load_modules(&paths::config().join("modules"))?;
-        config.load_sources(&paths::config().join("sources"))?;
+        config.load_modules(&paths::modules())?;
+        config.load_sources(&paths::config_sources())?;
         Ok(config)
     }
 
