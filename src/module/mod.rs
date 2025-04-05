@@ -11,7 +11,7 @@ use serde::Deserialize;
 
 use crate::{
     config, out,
-    source::{Source, name::SourceName, path::SourcePath},
+    source::{name::SourceName, path::SourcePath},
     state::State,
 };
 
@@ -76,16 +76,7 @@ impl Module {
             out!(1; "Fetching sources");
             for name in self.sources() {
                 if let Some(source) = config::source(name) {
-                    if *source == Source::Static
-                        || !config::fetch() && state.has_source(name, source)
-                    {
-                        out!(2, Y; "{name}"; "{source}");
-                    } else {
-                        match state.fetch_source(name, source) {
-                            Ok(_) => out!(2, G; "{name}"; "{source}"),
-                            Err(err) => out!(2, R; "{name}"; "{err}"),
-                        }
-                    }
+                    source.fetch_and_verify(state, name);
                 } else {
                     out!(2, R; "{}", name.magenta(); "Source isn't defined");
                 }

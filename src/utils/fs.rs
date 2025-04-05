@@ -6,14 +6,16 @@ use std::{
 };
 
 use anyhow::Result;
-use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 
-/// Call `f` on every path in a directory.
+/// Calls `f` on every path in a directory.
 ///
-/// `contents_first` determines whether the directory or it's contents are
-/// yielded first.
-pub fn walk_dir<P, F, E>(root: P, contents_first: bool, f: F) -> Result<(), E>
+/// `skip_root` determines whether the walked directory shouldn't be passed to
+/// `f`, and `contents_first` determines whether the directory or it's contents
+/// are yielded first.
+///
+/// The path passed to `f` is absolute.
+pub fn walk_dir<P, F, E>(root: P, skip_root: bool, contents_first: bool, f: F) -> Result<(), E>
 where
     P: AsRef<Path>,
     F: FnMut(PathBuf) -> Result<(), E>,
@@ -21,24 +23,27 @@ where
     let root = root.as_ref();
     WalkDir::new(root)
         .follow_root_links(false)
+        .min_depth(skip_root as usize)
         .contents_first(contents_first)
         .into_iter()
         .filter_map(|res| res.map(|entry| entry.into_path()).ok())
         .try_for_each(f)
 }
 
-/// Call `f` on every path in a directory. `f`'s second argument will be the
-/// relative path.
-///
-/// `contents_first` determines whether the directory or it's contents are
-/// yielded first.
-pub fn walk_dir_with_rel<P, F, E>(root: P, contents_first: bool, mut f: F) -> Result<(), E>
+/// Does the same as `walk_dir`, but passes the absolute and relative path to
+/// `f` instead of just the absolute path.
+pub fn walk_dir_rel<P, F, E>(
+    root: P,
+    skip_root: bool,
+    contents_first: bool,
+    mut f: F,
+) -> Result<(), E>
 where
     P: AsRef<Path>,
     F: FnMut(&Path, &Path) -> Result<(), E>,
 {
     let root = root.as_ref();
-    walk_dir(root, contents_first, |path| {
+    walk_dir(root, skip_root, contents_first, |path| {
         f(
             path.as_path(),
             path.strip_prefix(root)
@@ -73,7 +78,7 @@ where
     if !from.is_dir() {
         copy(from, to)
     } else {
-        walk_dir_with_rel(from, false, |path, rel_path| {
+        walk_dir_rel(from, false, false, |path, rel_path| {
             let to = to.join(rel_path);
             if path.is_dir() {
                 fs::create_dir(to)
@@ -95,18 +100,4 @@ where
     } else {
         fs::remove_file(path)
     }
-}
-
-pub type Sha256Hash = [u8; 32];
-
-/// Creates a SHA-256 hash from a file's contents.
-pub fn hash_file<P>(path: P) -> io::Result<Sha256Hash>
-where
-    P: AsRef<Path>,
-{
-    let path = path.as_ref();
-    let mut file = File::open(path)?;
-    let mut hasher = Sha256::new();
-    io::copy(&mut file, &mut hasher)?;
-    Ok(hasher.finalize().into())
 }

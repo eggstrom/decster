@@ -8,7 +8,10 @@ use bincode::{Decode, Encode};
 
 use crate::{
     out,
-    utils::{self, fs::Sha256Hash, output::PathExt},
+    utils::{
+        output::PathDisplay,
+        sha256::{PathHash, Sha256Hash},
+    },
 };
 
 #[derive(Decode, Encode)]
@@ -38,10 +41,10 @@ impl PathInfo {
             if match self {
                 PathInfo::Directory => path.is_dir(),
                 PathInfo::File { size, hash } => {
-                    metadata.size() == *size && utils::fs::hash_file(path).is_ok_and(|h| h == *hash)
+                    metadata.size() == *size && path.hash_file().is_ok_and(|h| h == *hash)
                 }
                 PathInfo::HardLink { size, hash } => {
-                    metadata.size() == *size && utils::fs::hash_file(path).is_ok_and(|h| h == *hash)
+                    metadata.size() == *size && path.hash_file().is_ok_and(|h| h == *hash)
                 }
                 PathInfo::Symlink { original } => path.read_link().is_ok_and(|o| o == *original),
             } {

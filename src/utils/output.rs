@@ -91,13 +91,13 @@ impl Display for DisplayKind<'_> {
     }
 }
 
-pub trait PathExt {
+pub trait PathDisplay {
     fn display_file(&self) -> DisplayFile;
     fn display_dir(&self) -> DisplayDir;
     fn display_kind(&self, kind: PathKind) -> DisplayKind;
 }
 
-impl PathExt for Path {
+impl PathDisplay for Path {
     fn display_file(&self) -> DisplayFile {
         DisplayFile(self)
     }

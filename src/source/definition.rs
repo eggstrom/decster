@@ -1,0 +1,49 @@
+use bincode::{Decode, Encode};
+use serde::Deserialize;
+
+use crate::{
+    config, out,
+    state::State,
+    utils::sha256::{PathHash, Sha256Hash},
+};
+
+use super::{Source, name::SourceName};
+
+#[derive(Clone, Decode, Deserialize, Encode, PartialEq)]
+#[serde(untagged)]
+pub enum SourceDefinition {
+    #[serde(skip)]
+    Static,
+    Dynamic {
+        #[serde(flatten)]
+        source: Source,
+        hash: Option<Sha256Hash>,
+    },
+}
+
+impl SourceDefinition {
+    pub fn fetch_and_verify(&self, state: &mut State, name: &SourceName) {
+        let (source, hash) = match self {
+            SourceDefinition::Static => return,
+            SourceDefinition::Dynamic { source, .. }
+                if !config::fetch() && state.has_source(name, self) =>
+            {
+                out!(2, Y; "{name}"; "{source}");
+                return;
+            }
+            SourceDefinition::Dynamic { source, hash } => (source, hash),
+        };
+        if let Err(err) = source.fetch(name) {
+            out!(2, R; "{name}"; "{err}");
+            return;
+        };
+        if let Some(hash) = hash {
+            if !name.path().hash_all().is_ok_and(|h| h == *hash) {
+                out!(2, R; "{name}"; "Contents don't match hash");
+                return;
+            }
+        }
+        out!(2, G; "{name}"; "{source}");
+        state.add_source(name, self);
+    }
+}

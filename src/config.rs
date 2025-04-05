@@ -13,7 +13,7 @@ use crate::{
     cli::Behavior,
     module::Module,
     paths,
-    source::{Source, name::SourceName},
+    source::{definition::SourceDefinition, name::SourceName},
     utils,
 };
 
@@ -24,7 +24,7 @@ struct Config {
     behavior: Behavior,
 
     #[serde(default)]
-    sources: HashMap<SourceName, Source>,
+    sources: HashMap<SourceName, SourceDefinition>,
     #[serde(default)]
     modules: BTreeMap<String, Module>,
 }
@@ -52,7 +52,7 @@ impl Config {
         if !dir.is_dir() {
             return Ok(());
         }
-        utils::fs::walk_dir_with_rel(dir, false, |path, rel_path| {
+        utils::fs::walk_dir_rel(dir, false, false, |path, rel_path| {
             if path.is_dir() {
                 return Ok(());
             }
@@ -76,7 +76,7 @@ impl Config {
         for entry in fs::read_dir(dir)?.filter_map(Result::ok) {
             let name = SourceName::from(entry.file_name());
             if !self.sources.contains_key(&name) {
-                self.sources.insert(name, Source::Static);
+                self.sources.insert(name, SourceDefinition::Static);
             } else {
                 bail!("Source {} is defined twice", name);
             }
@@ -118,7 +118,7 @@ pub fn quiet() -> bool {
     config().behavior.quiet
 }
 
-pub fn source(name: &SourceName) -> Option<&'static Source> {
+pub fn source(name: &SourceName) -> Option<&'static SourceDefinition> {
     config().sources.get(name)
 }
 

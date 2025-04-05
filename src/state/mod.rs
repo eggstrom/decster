@@ -1,7 +1,7 @@
 use std::{
     collections::{BTreeMap, HashSet},
     fs::{self, File},
-    io, mem,
+    mem,
     os::unix,
     path::{Path, PathBuf},
 };
@@ -14,16 +14,16 @@ use crate::{
     config,
     module::Module,
     out, paths,
-    source::{Source, name::SourceName},
+    source::{definition::SourceDefinition, name::SourceName},
     users::Users,
-    utils::output::PathExt,
+    utils::output::PathDisplay,
 };
 
 pub mod path;
 
 #[derive(Decode, Default, Encode)]
 pub struct State {
-    sources: BTreeMap<SourceName, Source>,
+    sources: BTreeMap<SourceName, SourceDefinition>,
     module_paths: BTreeMap<String, Vec<(PathBuf, PathInfo)>>,
     paths: HashSet<PathBuf>,
 }
@@ -48,7 +48,7 @@ impl State {
         bincode::config::standard()
     }
 
-    pub fn has_source(&self, name: &SourceName, source: &Source) -> bool {
+    pub fn has_source(&self, name: &SourceName, source: &SourceDefinition) -> bool {
         self.sources.get(name).is_some_and(|s| s == source) && name.path().exists()
     }
 
@@ -63,10 +63,8 @@ impl State {
         self.paths.contains(path.as_ref())
     }
 
-    pub fn fetch_source(&mut self, name: &SourceName, source: &Source) -> io::Result<()> {
-        source.fetch(name)?;
+    pub fn add_source(&mut self, name: &SourceName, source: &SourceDefinition) {
         self.sources.insert(name.clone(), source.clone());
-        Ok(())
     }
 
     pub fn add_path(&mut self, module: &str, path: &Path, info: PathInfo) {
@@ -143,9 +141,10 @@ impl State {
         module.create_symlinks(self, name);
 
         let uid = if let Some(user) = &module.user {
-            if !users.is_current(user) {
-                out!(1; "Changing file ownership");
+            if users.is_current(user) {
+                return;
             }
+            out!(1; "Changing file ownership");
             match users.uid(user) {
                 Ok(uid) => uid,
                 Err(err) => {

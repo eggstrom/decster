@@ -8,7 +8,7 @@ use crate::{
     config, out, paths,
     state::State,
     users::Users,
-    utils::output::PathExt,
+    utils::output::PathDisplay,
 };
 
 pub struct App {
