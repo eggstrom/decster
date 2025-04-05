@@ -1,8 +1,10 @@
+use std::{io, path::PathBuf};
+
 use bincode::{Decode, Encode};
 use serde::Deserialize;
 
 use crate::{
-    config, out,
+    config, out, paths,
     state::State,
     utils::sha256::{PathHash, Sha256Hash},
 };
@@ -22,6 +24,17 @@ pub enum SourceDefinition {
 }
 
 impl SourceDefinition {
+    pub fn path(&self, name: &SourceName) -> PathBuf {
+        match self {
+            SourceDefinition::Static => paths::config().join("sources").join(name),
+            SourceDefinition::Dynamic { .. } => paths::sources().join(name),
+        }
+    }
+
+    pub fn hash(&self, name: &SourceName) -> io::Result<Sha256Hash> {
+        self.path(name).hash_all()
+    }
+
     pub fn fetch_and_verify(&self, state: &mut State, name: &SourceName) {
         let (source, hash) = match self {
             SourceDefinition::Static => return,

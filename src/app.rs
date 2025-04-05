@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 
 use anyhow::Result;
 use clap::Parser;
@@ -6,9 +6,10 @@ use clap::Parser;
 use crate::{
     cli::{Cli, Command, InfoArgs},
     config, out, paths,
+    source::name::SourceName,
     state::State,
     users::Users,
-    utils::output::PathDisplay,
+    utils::{output::PathDisplay, sha256::PathHash},
 };
 
 pub struct App {
@@ -31,6 +32,7 @@ impl App {
             Command::Enable { modules } => app.enable(modules.into_iter().collect())?,
             Command::Disable { modules } => app.disable(modules.into_iter().collect())?,
             Command::Update { modules } => app.update(modules.into_iter().collect())?,
+            Command::Hash { sources } => app.hash(sources.into_iter().collect())?,
         }
         Ok(())
     }
@@ -96,5 +98,26 @@ impl App {
             }
         }
         self.state.save()
+    }
+
+    fn hash(self, sources: HashSet<SourceName>) -> Result<()> {
+        if sources.is_empty() {
+            let sources = self.state.sources();
+            if sources.len() == 0 {
+                out!(0, R; "There are no fetched sources");
+                return Ok(());
+            }
+            for (name, source) in self.state.sources() {
+                out!(0; "{name}: {}", source.path(&name).hash_all()?)
+            }
+        } else {
+            for name in sources {
+                match self.state.source(&name) {
+                    Some(source) => out!(0; "{name}: {}", source.path(&name).hash_all()?),
+                    None => out!(0, R; "Source {name} isn't defined"),
+                }
+            }
+        }
+        Ok(())
     }
 }

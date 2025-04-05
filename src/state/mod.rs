@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashSet},
     fs::{self, File},
     mem,
     os::unix,
@@ -46,6 +46,14 @@ impl State {
 
     fn bin_config() -> Configuration {
         bincode::config::standard()
+    }
+
+    pub fn source(&self, name: &SourceName) -> Option<&SourceDefinition> {
+        self.sources.get(name)
+    }
+
+    pub fn sources(&self) -> impl ExactSizeIterator<Item = (&SourceName, &SourceDefinition)> {
+        self.sources.iter()
     }
 
     pub fn has_source(&self, name: &SourceName, source: &SourceDefinition) -> bool {

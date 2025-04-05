@@ -34,7 +34,7 @@ impl FromStr for Sha256Hash {
 impl Display for Sha256Hash {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         for byte in self.0 {
-            write!(f, "{byte:X}")?;
+            write!(f, "{byte:02X}")?;
         }
         Ok(())
     }

@@ -2,7 +2,7 @@ use std::{collections::HashSet, path::PathBuf};
 
 use clap::{Args, Parser, Subcommand};
 
-use crate::state::ModuleFilter;
+use crate::{source::name::SourceName, state::ModuleFilter};
 
 #[derive(Debug, Parser)]
 pub struct Cli {
@@ -45,6 +45,9 @@ pub enum Command {
     /// Disable and re-enable modules
     #[command(alias = "u")]
     Update { modules: Vec<String> },
+    /// Show hashes of fetched sources
+    #[command(alias = "h")]
+    Hash { sources: Vec<SourceName> },
 }
 
 #[derive(Args, Clone, Debug)]
