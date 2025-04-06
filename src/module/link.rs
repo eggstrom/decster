@@ -96,6 +96,11 @@ impl<'a> ModuleLink<'a> {
 
 impl Display for ModuleLink<'_> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{} -> {}", self.path.display_file(), self.source)
+        let kind = if self.path.is_dir() {
+            PathKind::Directory
+        } else {
+            PathKind::File
+        };
+        write!(f, "{} -> {}", self.path.display_kind(kind), self.source)
     }
 }
