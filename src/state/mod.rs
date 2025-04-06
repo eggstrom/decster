@@ -14,7 +14,7 @@ use crate::{
     config,
     module::Module,
     out, paths,
-    source::{definition::SourceDefinition, name::SourceName},
+    source::{ident::SourceIdent, info::SourceInfo},
     users::Users,
     utils::output::PathDisplay,
 };
@@ -23,7 +23,7 @@ pub mod path;
 
 #[derive(Decode, Default, Encode)]
 pub struct State {
-    sources: BTreeMap<SourceName, SourceDefinition>,
+    sources: BTreeMap<SourceIdent, SourceInfo>,
     module_paths: BTreeMap<String, Vec<(PathBuf, PathInfo)>>,
     paths: HashSet<PathBuf>,
 }
@@ -49,16 +49,8 @@ impl State {
         bincode::config::standard()
     }
 
-    pub fn source(&self, name: &SourceName) -> Option<&SourceDefinition> {
-        self.sources.get(name)
-    }
-
-    pub fn sources(&self) -> impl ExactSizeIterator<Item = (&SourceName, &SourceDefinition)> {
-        self.sources.iter()
-    }
-
-    pub fn has_source(&self, name: &SourceName, source: &SourceDefinition) -> bool {
-        self.sources.get(name).is_some_and(|s| s == source) && name.named_path().exists()
+    pub fn has_source(&self, ident: &SourceIdent, source: &SourceInfo) -> bool {
+        self.sources.get(ident).is_some_and(|s| s == source) && ident.path().exists()
     }
 
     pub fn has_module(&self, module: &str) -> bool {
@@ -72,8 +64,8 @@ impl State {
         self.paths.contains(path.as_ref())
     }
 
-    pub fn add_source(&mut self, name: &SourceName, source: &SourceDefinition) {
-        self.sources.insert(name.clone(), source.clone());
+    pub fn add_source(&mut self, ident: &SourceIdent, source: &SourceInfo) {
+        self.sources.insert(ident.clone(), source.clone());
     }
 
     pub fn add_path(&mut self, module: &str, path: &Path, info: PathInfo) {
@@ -144,7 +136,7 @@ impl State {
 
     fn enable_module_inner(&mut self, users: &mut Users, name: &str, module: &Module) {
         out!(0; "Enabling module {}", name.magenta());
-        module.fetch_sources(self);
+        module.fetch_sources(self, name);
         module.create_files(self, name);
         module.create_hard_links(self, name);
         module.create_symlinks(self, name);

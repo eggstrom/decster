@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     fs,
     path::Path,
     sync::OnceLock,
@@ -13,7 +13,7 @@ use crate::{
     cli::Behavior,
     module::Module,
     paths,
-    source::{definition::SourceDefinition, name::SourceName},
+    source::{info::SourceInfo, name::SourceName},
     utils,
 };
 
@@ -23,8 +23,10 @@ struct Config {
     #[serde(skip)]
     behavior: Behavior,
 
-    #[serde(default)]
-    sources: HashMap<SourceName, SourceDefinition>,
+    #[serde(skip, default)]
+    sources: HashSet<SourceName>,
+    #[serde(default, rename = "sources")]
+    named_sources: HashMap<SourceName, SourceInfo>,
     #[serde(default)]
     modules: BTreeMap<String, Module>,
 }
@@ -33,8 +35,8 @@ impl Config {
     fn load(behavior: Behavior) -> Result<Self> {
         let mut config = Config::parse(paths::config())?;
         config.behavior = behavior;
-        config.load_modules(&paths::modules())?;
-        config.load_sources(&paths::config_sources())?;
+        config.load_modules(paths::modules())?;
+        config.load_sources(paths::config_sources())?;
         Ok(config)
     }
 
@@ -74,12 +76,7 @@ impl Config {
             return Ok(());
         }
         for entry in fs::read_dir(dir)?.filter_map(Result::ok) {
-            let name = SourceName::from(entry.file_name());
-            if !self.sources.contains_key(&name) {
-                self.sources.insert(name, SourceDefinition::Static);
-            } else {
-                bail!("Source {} is defined twice", name);
-            }
+            self.sources.insert(SourceName::from(entry.file_name()));
         }
         Ok(())
     }
@@ -118,8 +115,16 @@ pub fn quiet() -> bool {
     config().behavior.quiet
 }
 
-pub fn source(name: &SourceName) -> Option<&'static SourceDefinition> {
-    config().sources.get(name)
+pub fn has_source(name: &SourceName) -> bool {
+    config().sources.contains(name)
+}
+
+pub fn has_named_source(name: &SourceName) -> bool {
+    config().named_sources.contains_key(name)
+}
+
+pub fn named_source(name: &SourceName) -> Option<&'static SourceInfo> {
+    config().named_sources.get(name)
 }
 
 pub fn module(name: &str) -> Option<&'static Module> {

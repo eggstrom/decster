@@ -6,16 +6,17 @@ use std::{
 };
 
 use bincode::{Decode, Encode};
-use name::SourceName;
+use ident::SourceIdent;
 use serde::Deserialize;
 
 use crate::utils;
 
-pub mod definition;
+pub mod ident;
+pub mod info;
 pub mod name;
 pub mod path;
 
-#[derive(Clone, Debug, Decode, Deserialize, Encode, Eq, PartialEq)]
+#[derive(Clone, Debug, Decode, Deserialize, Encode, Eq, Hash, PartialEq, PartialOrd, Ord)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Source {
     Text(String),
@@ -24,8 +25,8 @@ pub enum Source {
 }
 
 impl Source {
-    pub fn fetch(&self, name: &SourceName) -> io::Result<()> {
-        let source_path = name.named_path();
+    pub fn fetch(&self, ident: &SourceIdent) -> io::Result<()> {
+        let source_path = ident.path();
         if source_path.exists() || source_path.is_symlink() {
             utils::fs::remove_all(&source_path)?;
         }

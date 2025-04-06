@@ -8,14 +8,12 @@ use anyhow::Result;
 use itertools::Itertools;
 use link::ModuleLink;
 use serde::Deserialize;
+use source::ModuleSource;
 
-use crate::{
-    config, out,
-    source::{name::SourceName, path::SourcePath},
-    state::State,
-};
+use crate::{config, out, source::ident::SourceIdent, state::State};
 
 pub mod link;
+pub mod source;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -26,11 +24,11 @@ pub struct Module {
     pub user: Option<String>,
 
     #[serde(default)]
-    files: BTreeMap<PathBuf, SourcePath>,
+    files: BTreeMap<PathBuf, ModuleSource>,
     #[serde(default)]
-    hard_links: BTreeMap<PathBuf, SourcePath>,
+    hard_links: BTreeMap<PathBuf, ModuleSource>,
     #[serde(default)]
-    symlinks: BTreeMap<PathBuf, SourcePath>,
+    symlinks: BTreeMap<PathBuf, ModuleSource>,
 }
 
 impl Module {
@@ -60,25 +58,42 @@ impl Module {
             .map(|(path, source)| ModuleLink::new(path.as_path(), source))
     }
 
-    pub fn sources(&self) -> impl Iterator<Item = &SourceName> {
+    pub fn sources(&self) -> impl Iterator<Item = (&Path, &ModuleSource)> {
         self.files
-            .values()
-            .chain(self.hard_links.values())
-            .chain(self.symlinks.values())
-            .map(|source| &source.name)
+            .iter()
+            .chain(self.hard_links.iter())
+            .chain(self.symlinks.iter())
+            .map(|(path, source)| (path.as_path(), source))
             .unique()
             .sorted()
     }
 
-    pub fn fetch_sources(&self, state: &mut State) {
+    pub fn fetch_sources(&self, state: &mut State, module: &str) {
         let sources = self.sources();
         if sources.size_hint().0 > 0 {
             out!(1; "Fetching sources");
-            for name in self.sources() {
-                if let Some(source) = config::source(name) {
-                    source.fetch_and_verify(state, name);
-                } else {
-                    out!(2, R; "{}", name.magenta(); "Source isn't defined");
+            for (path, source) in self.sources() {
+                match source {
+                    ModuleSource::Named(path) => {
+                        let ident = SourceIdent::named(path.name.clone());
+                        if let Some(source) = config::named_source(&path.name) {
+                            if config::fetch() || !state.has_source(&ident, source) {
+                                source.fetch_and_verify(state, &ident);
+                            } else {
+                                out!(2, Y; "{ident}"; "{source}");
+                            }
+                        } else if !config::has_source(&path.name) {
+                            out!(2, R; "{}", path.name.magenta(); "Source isn't defined");
+                        }
+                    }
+                    ModuleSource::Unnamed(source) => {
+                        let ident = SourceIdent::unnamed(module, path);
+                        if config::fetch() || !state.has_source(&ident, source) {
+                            source.fetch_and_verify(state, &ident);
+                        } else {
+                            out!(2, Y; "{ident}"; "{source}");
+                        }
+                    }
                 }
             }
         }

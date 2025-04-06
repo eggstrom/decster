@@ -17,12 +17,12 @@ use crate::paths;
 pub struct SourceName(String);
 
 impl SourceName {
-    pub fn named_path(&self) -> PathBuf {
-        paths::named_sources().join(self)
-    }
-
     pub fn config_path(&self) -> PathBuf {
         paths::config_sources().join(self)
+    }
+
+    pub fn named_path(&self) -> PathBuf {
+        paths::named_sources().join(self)
     }
 }
 

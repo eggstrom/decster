@@ -1,4 +1,8 @@
-use std::collections::{BTreeSet, HashSet};
+use std::{
+    collections::{BTreeSet, HashSet},
+    fs,
+    path::Path,
+};
 
 use anyhow::Result;
 use clap::Parser;
@@ -101,22 +105,23 @@ impl App {
     }
 
     fn hash(self, sources: HashSet<SourceName>) -> Result<()> {
-        if sources.is_empty() {
-            let sources = self.state.sources();
-            if sources.len() == 0 {
-                out!(0, R; "There are no fetched sources");
-                return Ok(());
-            }
-            for (name, source) in self.state.sources() {
-                out!(0; "{name}: {}", source.path(&name).hash_all()?)
-            }
-        } else {
-            for name in sources {
-                match self.state.source(&name) {
-                    Some(source) => out!(0; "{name}: {}", source.path(&name).hash_all()?),
-                    None => out!(0, R; "Source {name} isn't defined"),
-                }
-            }
+        self.hash_dir("Config", paths::config_sources(), &sources)?;
+        self.hash_dir("Named", paths::named_sources(), &sources)?;
+        Ok(())
+    }
+
+    fn hash_dir(&self, text: &str, dir: &Path, sources: &HashSet<SourceName>) -> Result<()> {
+        let mut sources: Vec<_> = fs::read_dir(dir)?
+            .filter_map(Result::ok)
+            .map(|entry| (SourceName::from(entry.file_name()), entry.path()))
+            .filter(|(name, _)| sources.is_empty() || sources.contains(name))
+            .collect();
+        sources.sort_unstable();
+        if !sources.is_empty() {
+            out!(0; "{} sources", text);
+        }
+        for (name, path) in sources {
+            out!(1; "{}: {}", name, path.hash_all()?)
         }
         Ok(())
     }

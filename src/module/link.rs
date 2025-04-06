@@ -7,8 +7,7 @@ use std::{
 };
 
 use crate::{
-    config, out, paths,
-    source::{definition::SourceDefinition, path::SourcePath},
+    out, paths,
     state::{
         State,
         path::{PathInfo, PathKind},
@@ -16,25 +15,26 @@ use crate::{
     utils::{self, output::PathDisplay, sha256::PathHash},
 };
 
+use super::source::ModuleSource;
+
 pub struct ModuleLink<'a> {
     path: &'a Path,
-    source: &'a SourcePath,
+    source: &'a ModuleSource,
 }
 
 impl<'a> ModuleLink<'a> {
-    pub fn new(path: &'a Path, source: &'a SourcePath) -> Self {
+    pub fn new(path: &'a Path, source: &'a ModuleSource) -> Self {
         ModuleLink { path, source }
     }
 
-    fn create_with<F>(&self, state: &mut State, name: &str, mut f: F)
+    fn create_with<F>(&self, state: &mut State, module: &str, mut f: F)
     where
         F: FnMut(&mut State, &Path, &Path) -> io::Result<()>,
     {
-        let source_path = match config::source(&self.source.name) {
-            Some(SourceDefinition::Static) => self.source.static_path(),
-            Some(_) => self.source.path(),
-            None => {
-                out!(2, R; "Source {} isn't defined", self.source.name);
+        let source_path = match self.source.path(module, self.path) {
+            Ok(path) => path,
+            Err(err) => {
+                out!(2, R; "{err}");
                 return;
             }
         };
@@ -54,7 +54,7 @@ impl<'a> ModuleLink<'a> {
             if state.has_path(&new_path) {
                 out!(2, R; "{}", new_path.display_kind(kind); "Path is used");
             } else if let PathKind::Directory = kind {
-                state.create_dir(name, &new_path);
+                state.create_dir(module, &new_path);
             } else if let Err(err) = f(state, path, &new_path) {
                 out!(2, R; "{}", new_path.display_file(); "{err}");
             } else {
@@ -96,10 +96,6 @@ impl<'a> ModuleLink<'a> {
 
 impl Display for ModuleLink<'_> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{} -> {}", self.path.display_file(), self.source.name)?;
-        if let Some(source_path) = &self.source.path {
-            source_path.display_file().fmt(f)?;
-        }
-        Ok(())
+        write!(f, "{} -> {}", self.path.display_file(), self.source)
     }
 }

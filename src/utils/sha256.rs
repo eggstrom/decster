@@ -11,7 +11,7 @@ use hex::{FromHex, FromHexError};
 use serde::{Deserialize, Deserializer, de};
 use sha2::{Digest, Sha256};
 
-#[derive(Clone, Decode, Encode, PartialEq)]
+#[derive(Clone, Decode, Encode, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct Sha256Hash([u8; 32]);
 
 impl<T> From<T> for Sha256Hash

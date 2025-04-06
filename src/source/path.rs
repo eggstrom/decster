@@ -16,14 +16,14 @@ use crate::utils::output::PathDisplay;
 
 use super::name::{ParseSourceNameError, SourceName};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct SourcePath {
     pub name: SourceName,
     pub path: Option<PathBuf>,
 }
 
 impl SourcePath {
-    pub fn path(&self) -> PathBuf {
+    pub fn named_path(&self) -> PathBuf {
         let mut full_path = self.name.named_path();
         if let Some(path) = &self.path {
             full_path.push(path);
@@ -31,7 +31,7 @@ impl SourcePath {
         full_path
     }
 
-    pub fn static_path(&self) -> PathBuf {
+    pub fn config_path(&self) -> PathBuf {
         let mut full_path = self.name.config_path();
         if let Some(path) = &self.path {
             full_path.push(path);

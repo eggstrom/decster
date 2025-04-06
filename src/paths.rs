@@ -1,5 +1,6 @@
 use std::{
     borrow::Cow,
+    fs,
     path::{Path, PathBuf},
     sync::OnceLock,
 };
@@ -28,13 +29,19 @@ impl Paths {
             .map(|path| path.join(APP_NAME))
             .ok_or(anyhow!("Couldn't determine path of data directory"))?;
 
+        let named_sources = data.join("named-sources");
+        let unnamed_sources = data.join("unnamed-sources");
+        fs::create_dir_all(&named_sources)
+            .and_then(|()| fs::create_dir_all(&unnamed_sources))
+            .map_err(|err| anyhow!("Couldn't create data directory ({err})"))?;
+
         Ok(Paths {
             home,
             config: config.join("config.toml"),
             modules: config.join("modules"),
             config_sources: config.join("sources"),
-            named_sources: data.join("named-sources"),
-            unnamed_sources: data.join("unnamed-sources"),
+            named_sources,
+            unnamed_sources,
             state: data.join("state"),
         })
     }
