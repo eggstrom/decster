@@ -38,13 +38,22 @@ pub enum Command {
     Info(InfoArgs),
     /// Enable modules
     #[command(alias = "e")]
-    Enable { modules: Vec<String> },
+    Enable {
+        #[arg(required = true, value_name = "PATTERNS")]
+        modules: Vec<String>,
+    },
     /// Disable modules
     #[command(alias = "d")]
-    Disable { modules: Vec<String> },
+    Disable {
+        #[arg(required = true, value_name = "PATTERNS")]
+        modules: Vec<String>,
+    },
     /// Disable and re-enable modules
     #[command(alias = "u")]
-    Update { modules: Vec<String> },
+    Update {
+        #[arg(value_name = "PATTERNS")]
+        modules: Vec<String>,
+    },
     /// Show hashes of fetched sources
     #[command(alias = "h")]
     Hash {
@@ -63,7 +72,6 @@ pub struct InfoArgs {
     #[arg(long, short = 'D')]
     pub disabled: bool,
 }
-
 impl InfoArgs {
     pub fn modules(self) -> (HashSet<String>, ModuleFilter) {
         (

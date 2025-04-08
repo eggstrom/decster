@@ -1,13 +1,13 @@
 use std::{
     collections::{BTreeMap, HashSet},
     fs::{self, File},
-    mem,
     os::unix,
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail, ensure};
 use bincode::{Decode, Encode, config::Configuration};
+use globset::GlobSet;
 use path::PathInfo;
 
 use crate::{
@@ -16,7 +16,7 @@ use crate::{
     out, paths,
     source::{ident::SourceIdent, info::SourceInfo},
     users::Users,
-    utils::output::PathDisplay,
+    utils::{glob::GlobSetExt, output::PathDisplay},
 };
 
 pub mod path;
@@ -111,30 +111,22 @@ impl State {
             })
     }
 
-    pub fn enable_module(&mut self, users: &mut Users, name: &str) {
-        if self.has_module(name) {
-            out!(0, R; "Module {} isn't disabled", name.magenta());
-        } else if let Some(module) = config::module(name) {
-            self.enable_module_inner(users, name, module);
-        } else {
-            out!(0, R; "Module {} isn't defined", name.magenta());
-        }
+    fn modules_matching_globs(&self, globs: &[String]) -> Result<Vec<String>> {
+        let globs = GlobSet::from_globs(globs)?;
+        let matches: Vec<_> = self
+            .module_paths
+            .keys()
+            .filter(move |name| globs.is_match(name))
+            .cloned()
+            .collect();
+        ensure!(
+            !matches.is_empty(),
+            "Patterns didn't match any enabled modules"
+        );
+        Ok(matches)
     }
 
-    pub fn enable_all_modules(&mut self, users: &mut Users) {
-        let mut has_enabled = false;
-        for (name, module) in config::modules() {
-            if !self.has_module(name) {
-                self.enable_module_inner(users, name, module);
-                has_enabled = true;
-            }
-        }
-        if !has_enabled {
-            out!(0, R; "There are no disabled modules");
-        }
-    }
-
-    fn enable_module_inner(&mut self, users: &mut Users, name: &str, module: &Module) {
+    pub fn enable_module(&mut self, users: &mut Users, name: &str, module: &Module) {
         out!(0; "Enabling module {}", name.magenta());
         module.fetch_sources(self, name);
         module.create_files(self, name);
@@ -168,69 +160,67 @@ impl State {
         }
     }
 
-    pub fn disable_module(&mut self, name: &str) {
-        if let Some((module, paths)) = self.module_paths.remove_entry(name) {
-            self.disable_module_inner(module, paths);
-        } else {
-            out!(0, R; "Module {} isn't enabled", name.magenta());
-        }
-    }
-
-    pub fn disable_all_modules(&mut self) {
-        if self.module_paths.is_empty() {
-            out!(0, R; "There are no enabled modules");
-        } else {
-            for (module, paths) in mem::take(&mut self.module_paths) {
-                self.disable_module_inner(module, paths);
-            }
-        }
-    }
-
-    fn disable_module_inner(&mut self, name: String, paths: Vec<(PathBuf, PathInfo)>) {
-        out!(0; "Disabling module {}", name.as_str().magenta());
+    fn disable_module(&mut self, name: &str) {
+        out!(0; "Disabling module {}", name.magenta());
         out!(1; "Removing owned paths");
-        // Any paths that can't be removed will be put back into the state.
-        let mut unremovable_paths = Vec::new();
 
+        let paths = self
+            .module_paths
+            .get_mut(name)
+            .expect("Whether `name` exists should be checked before calling this method");
         // Paths are removed in reverse order to make sure directories are
         // removed last.
-        for (path, info) in paths.into_iter().rev() {
-            if info.remove_if_owned(&path) {
-                self.paths.remove(&path);
-            } else {
-                unremovable_paths.push((path, info));
+        for i in (0..paths.len()).rev() {
+            let (path, info) = &paths[i];
+            if info.remove_if_owned(path) {
+                self.paths.remove(path);
+                paths.remove(i);
             }
         }
-
-        if !unremovable_paths.is_empty() {
-            unremovable_paths.reverse();
-            self.module_paths.insert(name, unremovable_paths);
+        if paths.is_empty() {
+            self.module_paths.remove(name);
         }
     }
 
-    pub fn update_module(&mut self, users: &mut Users, name: &str) {
-        if let Some((name_rc, paths)) = self.module_paths.remove_entry(name) {
-            self.disable_module_inner(name_rc, paths);
-            if let Some(module) = config::module(name) {
-                self.enable_module_inner(users, name, module);
-            }
-        } else {
-            out!(0, R; "Module {} isn't enabled", name.magenta());
+    pub fn disable_modules_matching_globs(&mut self, globs: &[String]) -> Result<()> {
+        for name in self.modules_matching_globs(globs)? {
+            self.disable_module(&name);
         }
+        Ok(())
     }
 
-    pub fn update_all_modules(&mut self, users: &mut Users) {
+    fn can_update(&self) -> Result<()> {
         if self.module_paths.is_empty() {
-            out!(0, R; "There are no enabled modules");
-        } else {
-            for (name, paths) in mem::take(&mut self.module_paths) {
-                let module = config::module(&name).map(|module| (name.to_string(), module));
-                self.disable_module_inner(name, paths);
-                if let Some((name, module)) = module {
-                    self.enable_module_inner(users, &name, module);
-                }
-            }
+            bail!("There are no enabled modules to update");
         }
+        Ok(())
+    }
+
+    fn update_module(&mut self, users: &mut Users, name: &str, module: Option<&Module>) {
+        self.disable_module(name);
+        if let Some(module) = module {
+            self.enable_module(users, name, module);
+        }
+    }
+
+    pub fn update_all_modules(&mut self, users: &mut Users) -> Result<()> {
+        self.can_update()?;
+        for name in self.module_paths.keys().cloned().collect::<Vec<_>>() {
+            self.update_module(users, &name, config::module(&name));
+        }
+        Ok(())
+    }
+
+    pub fn update_modules_matching_globs(
+        &mut self,
+        users: &mut Users,
+        globs: &[String],
+    ) -> Result<()> {
+        self.can_update()?;
+        for name in self.modules_matching_globs(globs)? {
+            self.update_module(users, &name, config::module(&name));
+        }
+        Ok(())
     }
 }
 

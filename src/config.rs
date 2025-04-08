@@ -7,6 +7,7 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use crossterm::style::Stylize;
+use globset::GlobSet;
 use serde::Deserialize;
 
 use crate::{
@@ -14,7 +15,7 @@ use crate::{
     module::Module,
     paths,
     source::{info::SourceInfo, name::SourceName},
-    utils,
+    utils::{self, glob::GlobSetExt},
 };
 
 #[derive(Deserialize)]
@@ -136,4 +137,11 @@ pub fn modules() -> impl Iterator<Item = (&'static str, &'static Module)> {
         .modules
         .iter()
         .map(|(name, module)| (name.as_str(), module))
+}
+
+pub fn modules_matching_globs(
+    globs: &[String],
+) -> Result<impl Iterator<Item = (&'static str, &'static Module)>, globset::Error> {
+    let globs = GlobSet::from_globs(globs)?;
+    Ok(modules().filter(move |(name, _)| globs.is_match(name)))
 }

@@ -1,10 +1,6 @@
-use std::{
-    collections::{BTreeSet, HashSet},
-    fs,
-    path::Path,
-};
+use std::{collections::HashSet, fs, path::Path};
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clap::Parser;
 
 use crate::{
@@ -33,9 +29,9 @@ impl App {
 
         match cli.command {
             Command::Info(args) => app.info(args),
-            Command::Enable { modules } => app.enable(modules.into_iter().collect())?,
+            Command::Enable { modules } => app.enable(modules)?,
             Command::Disable { modules } => app.disable(modules.into_iter().collect())?,
-            Command::Update { modules } => app.update(modules.into_iter().collect())?,
+            Command::Update { modules } => app.update(modules)?,
             Command::Hash { sources } => app.hash(sources.into_iter().collect())?,
         }
         Ok(())
@@ -71,35 +67,31 @@ impl App {
         }
     }
 
-    fn enable(mut self, modules: BTreeSet<String>) -> Result<()> {
-        if modules.is_empty() {
-            self.state.enable_all_modules(&mut self.users);
-        } else {
-            for module in modules {
-                self.state.enable_module(&mut self.users, &module);
+    fn enable(mut self, modules: Vec<String>) -> Result<()> {
+        let mut has_enabled = false;
+        for (name, module) in config::modules_matching_globs(&modules)? {
+            if !self.state.has_module(name) {
+                has_enabled = true;
+                self.state.enable_module(&mut self.users, name, module);
             }
+        }
+        if !has_enabled {
+            bail!("Patterns didn't match any disabled modules");
         }
         self.state.save()
     }
 
-    fn disable(mut self, modules: BTreeSet<String>) -> Result<()> {
-        if modules.is_empty() {
-            self.state.disable_all_modules();
-        } else {
-            for module in modules {
-                self.state.disable_module(&module);
-            }
-        }
+    fn disable(mut self, modules: Vec<String>) -> Result<()> {
+        self.state.disable_modules_matching_globs(&modules)?;
         self.state.save()
     }
 
-    fn update(mut self, modules: BTreeSet<String>) -> Result<()> {
+    fn update(mut self, modules: Vec<String>) -> Result<()> {
         if modules.is_empty() {
-            self.state.update_all_modules(&mut self.users);
+            self.state.update_all_modules(&mut self.users)?;
         } else {
-            for module in modules {
-                self.state.update_module(&mut self.users, &module);
-            }
+            self.state
+                .update_modules_matching_globs(&mut self.users, &modules)?;
         }
         self.state.save()
     }
