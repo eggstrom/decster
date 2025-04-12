@@ -1,7 +1,7 @@
 use std::{
     fs::{self, File},
     io,
-    os::unix,
+    os::unix::{self},
     path::{Path, PathBuf},
 };
 
@@ -15,10 +15,10 @@ use walkdir::WalkDir;
 /// are yielded first.
 ///
 /// The path passed to `f` is absolute.
-pub fn walk_dir<P, F, E>(root: P, skip_root: bool, contents_first: bool, f: F) -> Result<(), E>
+pub fn walk_dir<P, F>(root: P, skip_root: bool, contents_first: bool, f: F) -> Result<()>
 where
     P: AsRef<Path>,
-    F: FnMut(PathBuf) -> Result<(), E>,
+    F: FnMut(PathBuf) -> Result<()>,
 {
     let root = root.as_ref();
     WalkDir::new(root)
@@ -32,15 +32,10 @@ where
 
 /// Does the same as `walk_dir`, but passes the absolute and relative path to
 /// `f` instead of just the absolute path.
-pub fn walk_dir_rel<P, F, E>(
-    root: P,
-    skip_root: bool,
-    contents_first: bool,
-    mut f: F,
-) -> Result<(), E>
+pub fn walk_dir_rel<P, F>(root: P, skip_root: bool, contents_first: bool, mut f: F) -> Result<()>
 where
     P: AsRef<Path>,
-    F: FnMut(&Path, &Path) -> Result<(), E>,
+    F: FnMut(&Path, &Path) -> Result<()>,
 {
     let root = root.as_ref();
     walk_dir(root, skip_root, contents_first, |path| {
@@ -69,14 +64,14 @@ where
 }
 
 /// Recursively copies the contents of a directory.
-pub fn copy_all<P, Q>(from: P, to: Q) -> io::Result<()>
+pub fn copy_all<P, Q>(from: P, to: Q) -> Result<()>
 where
     P: AsRef<Path>,
     Q: AsRef<Path>,
 {
     let (from, to) = (from.as_ref(), to.as_ref());
     if !from.is_dir() {
-        copy(from, to)
+        copy(from, to)?;
     } else {
         walk_dir_rel(from, false, false, |path, rel_path| {
             let to = to.join(rel_path);
@@ -84,9 +79,11 @@ where
                 fs::create_dir(to)
             } else {
                 copy(path, to)
-            }
-        })
+            }?;
+            Ok(())
+        })?;
     }
+    Ok(())
 }
 
 /// Recursively removes a file or directory.

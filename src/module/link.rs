@@ -6,91 +6,126 @@ use std::{
     path::Path,
 };
 
+use anyhow::{Result, bail};
+use nix::unistd::Uid;
+
 use crate::{
-    out, paths,
+    paths,
     state::{
         State,
         path::{PathInfo, PathKind},
     },
+    users::Users,
     utils::{self, output::PathDisplay, sha256::PathHash},
 };
 
 use super::source::ModuleSource;
 
+#[derive(Eq, Ord, PartialEq, PartialOrd)]
+enum LinkKind {
+    File,
+    HardLink,
+    Symlink,
+}
+
+#[derive(Eq, Ord, PartialOrd)]
 pub struct ModuleLink<'a> {
+    kind: LinkKind,
     path: &'a Path,
     source: &'a ModuleSource,
+    uid: Option<u32>,
 }
 
 impl<'a> ModuleLink<'a> {
-    pub fn new(path: &'a Path, source: &'a ModuleSource) -> Self {
-        ModuleLink { path, source }
+    pub fn file(path: &'a Path, source: &'a ModuleSource, uid: Option<Uid>) -> Self {
+        ModuleLink {
+            kind: LinkKind::File,
+            path,
+            source,
+            uid: uid.map(|uid| uid.as_raw()),
+        }
     }
 
-    fn create_with<F>(&self, state: &mut State, module: &str, mut f: F)
-    where
-        F: FnMut(&mut State, &Path, &Path) -> io::Result<()>,
-    {
-        let source_path = match self.source.path(module, self.path) {
-            Ok(path) => path,
-            Err(err) => {
-                out!(2, R; "{err}");
-                return;
-            }
-        };
+    pub fn hard_link(path: &'a Path, source: &'a ModuleSource, uid: Option<Uid>) -> Self {
+        ModuleLink {
+            kind: LinkKind::HardLink,
+            path,
+            source,
+            uid: uid.map(|uid| uid.as_raw()),
+        }
+    }
 
-        let _ = utils::fs::walk_dir_rel(source_path, false, false, |path, rel_path| {
+    pub fn symlink(path: &'a Path, source: &'a ModuleSource, uid: Option<Uid>) -> Self {
+        ModuleLink {
+            kind: LinkKind::Symlink,
+            path,
+            source,
+            uid: uid.map(|uid| uid.as_raw()),
+        }
+    }
+
+    pub fn create(&self, users: &mut Users, state: &mut State, module: &str) -> Result<()> {
+        let source_path = self.source.fetch(state, module, self.path)?;
+
+        utils::fs::walk_dir_rel(source_path, false, false, |path, rel_path| {
             let mut new_path = paths::untildefy(self.path);
             if rel_path.parent().is_some() {
                 new_path = Cow::Owned(new_path.join(rel_path));
             }
 
-            let kind = if path.is_dir() {
-                PathKind::Directory
+            if state.is_path_owned(&new_path) {
+                bail!("Path is used by another module");
+            } else if path.is_dir() {
+                if !new_path.is_dir() {
+                    fs::create_dir(&new_path)?;
+                    self.change_ownership(users, &new_path)?;
+                    state.add_path(module, &new_path, PathInfo::Directory);
+                }
             } else {
-                PathKind::File
-            };
-
-            if state.has_path(&new_path) {
-                out!(2, R; "{}", new_path.display_kind(kind); "Path is used");
-            } else if let PathKind::Directory = kind {
-                state.create_dir(module, &new_path);
-            } else if let Err(err) = f(state, path, &new_path) {
-                out!(2, R; "{}", new_path.display_file(); "{err}");
-            } else {
-                out!(2, G; "{}", new_path.display_file());
+                let info = match self.kind {
+                    LinkKind::File => Self::create_file(path, &new_path),
+                    LinkKind::HardLink => Self::create_hard_link(path, &new_path),
+                    LinkKind::Symlink => Self::create_symlink(path, &new_path),
+                }?;
+                self.change_ownership(users, &new_path)?;
+                state.add_path(module, &new_path, info);
             }
-            Ok::<_, ()>(())
-        });
+            Ok(())
+        })?;
+        Ok(())
     }
 
-    pub fn create_files(&self, state: &mut State, module: &str) {
-        self.create_with(state, module, |state, from, to| {
-            let size = from.symlink_metadata()?.size();
-            let hash = from.hash_file()?;
-            utils::fs::copy(from, to)?;
-            state.add_path(module, to, PathInfo::File { size, hash });
-            Ok(())
-        });
+    fn create_file(from: &Path, to: &Path) -> io::Result<PathInfo> {
+        let size = from.symlink_metadata()?.size();
+        let hash = from.hash_file()?;
+        utils::fs::copy(from, to)?;
+        Ok(PathInfo::File { size, hash })
     }
 
-    pub fn create_hard_links(&self, state: &mut State, module: &str) {
-        self.create_with(state, module, |state, original, link| {
-            let size = original.symlink_metadata()?.size();
-            let hash = original.hash_file()?;
-            fs::hard_link(original, link)?;
-            state.add_path(module, link, PathInfo::HardLink { size, hash });
-            Ok(())
-        });
+    fn create_hard_link(original: &Path, link: &Path) -> io::Result<PathInfo> {
+        let size = original.symlink_metadata()?.size();
+        let hash = original.hash_file()?;
+        fs::hard_link(original, link)?;
+        Ok(PathInfo::HardLink { size, hash })
     }
 
-    pub fn create_symlinks(&self, state: &mut State, module: &str) {
-        self.create_with(state, module, |state, original, link| {
-            unix::fs::symlink(original, link)?;
-            let original = original.to_path_buf();
-            state.add_path(module, link, PathInfo::Symlink { original });
-            Ok(())
-        });
+    fn create_symlink(original: &Path, link: &Path) -> io::Result<PathInfo> {
+        unix::fs::symlink(original, link)?;
+        let original = original.to_path_buf();
+        Ok(PathInfo::Symlink { original })
+    }
+
+    fn change_ownership(&self, users: &mut Users, path: &Path) -> io::Result<()> {
+        if !self.uid.is_some_and(|uid| users.is_current_uid(uid)) {
+            unix::fs::lchown(path, self.uid, None)?;
+        }
+        Ok(())
+    }
+}
+
+impl PartialEq for ModuleLink<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.path == other.path
     }
 }
 

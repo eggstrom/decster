@@ -11,15 +11,6 @@ struct User {
     home: PathBuf,
 }
 
-impl From<unistd::User> for User {
-    fn from(value: unistd::User) -> Self {
-        User {
-            uid: value.uid,
-            home: value.dir,
-        }
-    }
-}
-
 pub struct Users {
     uid: Uid,
     users: HashMap<String, Option<User>>,
@@ -40,9 +31,9 @@ impl Users {
         }
         self.users
             .get(name)
-            .expect("At this point, this entry should always exist")
+            .unwrap()
             .as_ref()
-            .ok_or(anyhow!("User doesn't exist"))
+            .ok_or_else(|| anyhow!("User doesn't exist"))
     }
 
     pub fn uid(&mut self, name: &str) -> Result<Uid> {
@@ -53,7 +44,19 @@ impl Users {
         self.user(name).map(|user| user.home.as_path())
     }
 
-    pub fn is_current(&mut self, name: &str) -> bool {
-        self.uid(name).is_ok_and(|uid| uid == self.uid)
+    pub fn is_current_uid<U>(&mut self, uid: U) -> bool
+    where
+        U: Into<Uid>,
+    {
+        uid.into() == self.uid
+    }
+}
+
+impl From<unistd::User> for User {
+    fn from(value: unistd::User) -> Self {
+        User {
+            uid: value.uid,
+            home: value.dir,
+        }
     }
 }

@@ -1,18 +1,18 @@
 use std::{
     fmt::{self, Display, Formatter},
-    fs, io,
+    fs,
     os::unix,
     path::{Path, PathBuf},
 };
 
+use anyhow::Result;
 use bincode::{Decode, Encode};
-use ident::SourceIdent;
 use serde::Deserialize;
 
 use crate::utils;
 
+pub mod hashable;
 pub mod ident;
-pub mod info;
 pub mod name;
 pub mod path;
 
@@ -25,8 +25,7 @@ pub enum Source {
 }
 
 impl Source {
-    pub fn fetch(&self, ident: &SourceIdent) -> io::Result<()> {
-        let source_path = ident.path();
+    pub fn fetch(&self, source_path: &Path) -> Result<()> {
         if source_path.exists() || source_path.is_symlink() {
             utils::fs::remove_all(&source_path)?;
         }
@@ -38,15 +37,15 @@ impl Source {
         }
     }
 
-    fn fetch_text(&self, source_path: &Path, text: &str) -> io::Result<()> {
-        fs::write(source_path, text)
+    fn fetch_text(&self, source_path: &Path, text: &str) -> Result<()> {
+        Ok(fs::write(source_path, text)?)
     }
 
-    fn fetch_symlink(&self, source_path: &Path, path: &Path) -> io::Result<()> {
-        unix::fs::symlink(path, source_path)
+    fn fetch_symlink(&self, source_path: &Path, path: &Path) -> Result<()> {
+        Ok(unix::fs::symlink(path, source_path)?)
     }
 
-    fn fetch_path(&self, source_path: &Path, path: &Path) -> io::Result<()> {
+    fn fetch_path(&self, source_path: &Path, path: &Path) -> Result<()> {
         utils::fs::copy_all(path, source_path)
     }
 }

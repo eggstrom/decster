@@ -4,15 +4,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use anyhow::Result;
 use bincode::{Decode, Encode};
+use crossterm::style::Stylize;
 
-use crate::{
-    out,
-    utils::{
-        output::PathDisplay,
-        sha256::{PathHash, Sha256Hash},
-    },
-};
+use crate::utils::sha256::{PathHash, Sha256Hash};
 
 #[derive(Decode, Encode)]
 pub enum PathInfo {
@@ -57,34 +53,24 @@ impl PathInfo {
         }
     }
 
-    /// Removes `path` if it's contents match `self`. The returned `bool` tells
-    /// if `path` was removed.
-    pub fn remove_if_owned<P>(&self, path: P) -> bool
+    pub fn remove_if_owned<P>(&self, path: P) -> Result<()>
     where
         P: AsRef<Path>,
     {
         let path = path.as_ref();
-        let kind = self.kind();
         match self.state(path) {
-            PathState::Owned => {
-                if let Err(err) = match kind {
-                    PathKind::Directory => fs::remove_dir(path),
-                    _ => fs::remove_file(path),
-                } {
-                    out!(2, R; "{}", path.display_kind(kind); "{err}");
-                    return false;
-                } else {
-                    out!(2, G; "{}", path.display_kind(kind));
-                }
-            }
+            PathState::Owned => match self.kind() {
+                PathKind::Directory => fs::remove_dir(path)?,
+                _ => fs::remove_file(path)?,
+            },
             PathState::Changed => {
-                out!(2, Y; "{}", path.display_kind(kind); "File changed")
+                eprintln!("{} Skipped {} (File has changed)", "info:".yellow(), path.display());
             }
             PathState::Missing => {
-                out!(2, Y; "{}", path.display_kind(kind); "File missing")
+                eprintln!("{} Skipped {} (File is missing)", "info:".yellow(), path.display());
             }
         }
-        true
+        Ok(())
     }
 }
 

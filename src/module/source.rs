@@ -10,7 +10,8 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     config, paths,
-    source::{info::SourceInfo, path::SourcePath},
+    source::{hashable::HashableSource, ident::SourceIdent, path::SourcePath},
+    state::State,
     utils::sha256::Sha256Hash,
 };
 
@@ -18,23 +19,40 @@ use crate::{
 #[serde(untagged)]
 pub enum ModuleSource {
     Named(SourcePath),
-    Unnamed(SourceInfo),
+    Unnamed(HashableSource),
 }
 
 impl ModuleSource {
-    pub fn path(&self, module: &str, path: &Path) -> Result<PathBuf> {
-        Ok(match self {
-            ModuleSource::Named(path) if config::has_named_source(&path.name) => path.named_path(),
-            ModuleSource::Named(path) if config::has_source(&path.name) => path.config_path(),
-            ModuleSource::Named(path) => bail!("Source {} isn't defined", path.name),
-            ModuleSource::Unnamed(_) => {
+    pub fn fetch(&self, state: &mut State, module: &str, path: &Path) -> Result<PathBuf> {
+        let (path, info) = match self {
+            ModuleSource::Named(path) => {
+                if let Some(source) = config::named_source(&path.name) {
+                    let ident = SourceIdent::named(path.name.clone());
+                    (path.named_path(), Some((ident, source)))
+                } else if config::has_source(&path.name) {
+                    (path.config_path(), None)
+                } else {
+                    bail!("Source isn't defined");
+                }
+            }
+            ModuleSource::Unnamed(source) => {
                 let mut hasher = Sha256::new();
                 hasher.update(module);
                 hasher.update(path.to_string_lossy().as_ref());
                 let hash = Sha256Hash::from(hasher.finalize());
-                paths::unnamed_sources().join(hash.to_string())
+                let ident = SourceIdent::unnamed(module, path);
+                let path = paths::unnamed_sources().join(hash.to_string());
+                (path, Some((ident, source)))
             }
-        })
+        };
+
+        if let Some((ident, source)) = info {
+            if !state.is_source_fetched(&ident, source) {
+                source.fetch(&path)?;
+                state.add_source(&ident, source);
+            }
+        }
+        Ok(path)
     }
 }
 

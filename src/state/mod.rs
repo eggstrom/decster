@@ -1,20 +1,19 @@
 use std::{
     collections::{BTreeMap, HashSet},
     fs::{self, File},
-    os::unix,
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result, bail, ensure};
+use anyhow::{Context, Result, anyhow, bail};
 use bincode::{Decode, Encode, config::Configuration};
+use crossterm::style::Stylize;
 use globset::GlobSet;
 use path::PathInfo;
 
 use crate::{
-    config,
-    module::Module,
-    out, paths,
-    source::{ident::SourceIdent, info::SourceInfo},
+    module::set::ModuleSet,
+    paths,
+    source::{hashable::HashableSource, ident::SourceIdent},
     users::Users,
     utils::{glob::GlobSetExt, output::PathDisplay},
 };
@@ -23,7 +22,7 @@ pub mod path;
 
 #[derive(Decode, Default, Encode)]
 pub struct State {
-    sources: BTreeMap<SourceIdent, SourceInfo>,
+    sources: BTreeMap<SourceIdent, HashableSource>,
     module_paths: BTreeMap<String, Vec<(PathBuf, PathInfo)>>,
     paths: HashSet<PathBuf>,
 }
@@ -49,22 +48,22 @@ impl State {
         bincode::config::standard()
     }
 
-    pub fn has_source(&self, ident: &SourceIdent, source: &SourceInfo) -> bool {
+    pub fn is_source_fetched(&self, ident: &SourceIdent, source: &HashableSource) -> bool {
         self.sources.get(ident).is_some_and(|s| s == source) && ident.path().exists()
     }
 
-    pub fn has_module(&self, module: &str) -> bool {
+    pub fn is_module_enabled(&self, module: &str) -> bool {
         self.module_paths.contains_key(module)
     }
 
-    pub fn has_path<P>(&self, path: P) -> bool
+    pub fn is_path_owned<P>(&self, path: P) -> bool
     where
         P: AsRef<Path>,
     {
         self.paths.contains(path.as_ref())
     }
 
-    pub fn add_source(&mut self, ident: &SourceIdent, source: &SourceInfo) {
+    pub fn add_source(&mut self, ident: &SourceIdent, source: &HashableSource) {
         self.sources.insert(ident.clone(), source.clone());
     }
 
@@ -78,39 +77,6 @@ impl State {
         }
     }
 
-    pub fn create_dir(&mut self, module: &str, path: &Path) {
-        if !path.is_dir() {
-            if let Err(err) = fs::create_dir(path) {
-                out!(2, R; "{}", path.display_dir(); "{err}");
-            } else {
-                self.add_path(module, path, PathInfo::Directory);
-                out!(2, G; "{}", path.display_dir());
-            }
-        }
-    }
-
-    /// Returns a list of module names, definitions, and owned paths.
-    ///
-    /// If `modules` isn't empty, all modules not in `modules` will be filtered
-    /// out. `filter` determines whether to look for all modules, enabled
-    /// modules, or disabled modules.
-    pub fn modules(
-        &self,
-        modules: HashSet<String>,
-        filter: ModuleFilter,
-    ) -> impl Iterator<Item = (&str, &Module, Option<&Vec<(PathBuf, PathInfo)>>)> {
-        config::modules()
-            .map(|(name, module)| (name, module, self.module_paths.get(name)))
-            .filter(move |(name, _, paths)| {
-                (modules.is_empty() || modules.contains(*name))
-                    && match filter {
-                        ModuleFilter::All => true,
-                        ModuleFilter::Enabled => paths.is_some(),
-                        ModuleFilter::Disabled => paths.is_none(),
-                    }
-            })
-    }
-
     fn modules_matching_globs(&self, globs: &[String]) -> Result<Vec<String>> {
         let globs = GlobSet::from_globs(globs)?;
         let matches: Vec<_> = self
@@ -119,51 +85,31 @@ impl State {
             .filter(move |name| globs.is_match(name))
             .cloned()
             .collect();
-        ensure!(
-            !matches.is_empty(),
-            "Patterns didn't match any enabled modules"
-        );
+        if matches.is_empty() {
+            bail!("Patterns didn't match any enabled modules");
+        }
         Ok(matches)
     }
 
-    pub fn enable_module(&mut self, users: &mut Users, name: &str, module: &Module) {
-        out!(0; "Enabling module {}", name.magenta());
-        module.fetch_sources(self, name);
-        module.create_files(self, name);
-        module.create_hard_links(self, name);
-        module.create_symlinks(self, name);
-
-        let uid = if let Some(user) = &module.user {
-            if users.is_current(user) {
-                return;
+    pub fn enable_module(
+        &mut self,
+        users: &mut Users,
+        name: &str,
+        modules: &ModuleSet,
+    ) -> Result<()> {
+        if let Err(err) = modules
+            .enable(users, self, name)
+            .with_context(|| anyhow!("Couldn't enable module {}", name.magenta()))
+        {
+            if let Err(err) = self.disable_module(name) {
+                eprintln!("{} {err:?}", "error:".red());
             }
-            out!(1; "Changing file ownership");
-            match users.uid(user) {
-                Ok(uid) => uid,
-                Err(err) => {
-                    out!(2, R; "Couldn't get {}'s UID", user.as_str().magenta(); "{err}");
-                    return;
-                }
-            }
-        } else {
-            return;
-        };
-
-        if let Some(module_paths) = self.module_paths.get(name) {
-            for (path, info) in module_paths {
-                let display = path.display_kind(info.kind());
-                match unix::fs::lchown(path, Some(uid.as_raw()), None) {
-                    Ok(()) => out!(2, G; "{display}"),
-                    Err(err) => out!(2, R; "{display}"; "{err}"),
-                }
-            }
+            bail!(err);
         }
+        Ok(())
     }
 
-    fn disable_module(&mut self, name: &str) {
-        out!(0; "Disabling module {}", name.magenta());
-        out!(1; "Removing owned paths");
-
+    fn disable_module(&mut self, name: &str) -> Result<()> {
         let paths = self
             .module_paths
             .get_mut(name)
@@ -172,19 +118,19 @@ impl State {
         // removed last.
         for i in (0..paths.len()).rev() {
             let (path, info) = &paths[i];
-            if info.remove_if_owned(path) {
-                self.paths.remove(path);
-                paths.remove(i);
-            }
+            info.remove_if_owned(path)?;
+            self.paths.remove(path);
+            paths.remove(i);
         }
-        if paths.is_empty() {
-            self.module_paths.remove(name);
-        }
+        self.module_paths.remove(name);
+        Ok(())
     }
 
     pub fn disable_modules_matching_globs(&mut self, globs: &[String]) -> Result<()> {
         for name in self.modules_matching_globs(globs)? {
-            self.disable_module(&name);
+            if let Err(err) = self.disable_module(&name) {
+                eprintln!("{} {err:?}", "error:".red());
+            }
         }
         Ok(())
     }
@@ -196,17 +142,26 @@ impl State {
         Ok(())
     }
 
-    fn update_module(&mut self, users: &mut Users, name: &str, module: Option<&Module>) {
-        self.disable_module(name);
-        if let Some(module) = module {
-            self.enable_module(users, name, module);
+    fn update_module(
+        &mut self,
+        users: &mut Users,
+        name: &str,
+        modules: Option<&ModuleSet>,
+    ) -> Result<()> {
+        self.disable_module(name)?;
+        if let Some(modules) = modules {
+            self.enable_module(users, name, modules)?;
         }
+        Ok(())
     }
 
     pub fn update_all_modules(&mut self, users: &mut Users) -> Result<()> {
         self.can_update()?;
         for name in self.module_paths.keys().cloned().collect::<Vec<_>>() {
-            self.update_module(users, &name, config::module(&name));
+            if let Err(err) = self.update_module(users, &name, ModuleSet::new(&name).ok().as_ref())
+            {
+                eprintln!("{} {err:?}", "error:".red());
+            }
         }
         Ok(())
     }
@@ -218,14 +173,11 @@ impl State {
     ) -> Result<()> {
         self.can_update()?;
         for name in self.modules_matching_globs(globs)? {
-            self.update_module(users, &name, config::module(&name));
+            if let Err(err) = self.update_module(users, &name, ModuleSet::new(&name).ok().as_ref())
+            {
+                eprintln!("{} {err:?}", "error:".red());
+            }
         }
         Ok(())
     }
-}
-
-pub enum ModuleFilter {
-    All,
-    Enabled,
-    Disabled,
 }

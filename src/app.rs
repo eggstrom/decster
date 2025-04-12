@@ -2,14 +2,17 @@ use std::{collections::HashSet, fs, path::Path};
 
 use anyhow::{Result, bail};
 use clap::Parser;
+use crossterm::style::Stylize;
 
 use crate::{
     cli::{Cli, Command, InfoArgs},
-    config, out, paths,
+    config,
+    module::set::ModuleSet,
+    out, paths,
     source::name::SourceName,
     state::State,
     users::Users,
-    utils::{output::PathDisplay, sha256::PathHash},
+    utils::sha256::PathHash,
 };
 
 pub struct App {
@@ -22,7 +25,7 @@ impl App {
         let cli = Cli::parse();
         paths::load(cli.config)?;
         config::load(cli.behavior)?;
-        let app = App {
+        let mut app = App {
             users: Users::new(),
             state: State::load()?,
         };
@@ -37,42 +40,19 @@ impl App {
         Ok(())
     }
 
-    fn info(self, args: InfoArgs) {
-        let (modules, filter) = args.modules();
-        for (name, module, paths) in self.state.modules(modules, filter) {
-            out!(0; "Module {}", name.magenta());
-            let files = module.files();
-            let hard_links = module.hard_links();
-            let symlinks = module.symlinks();
-
-            if files.len() > 0 {
-                out!(1; "Files");
-                files.for_each(|link| out!(2; "{link}"));
-            }
-            if hard_links.len() > 0 {
-                out!(1; "Hard links");
-                hard_links.for_each(|link| out!(2; "{link}"));
-            }
-            if symlinks.len() > 0 {
-                out!(1; "Symlinks");
-                symlinks.for_each(|link| out!(2; "{link}"));
-            }
-
-            if let Some(paths) = paths {
-                out!(1; "Owned paths");
-                for (path, info) in paths {
-                    out!(2; "{}", path.display_kind(info.kind()))
-                }
-            }
-        }
+    fn info(&self, args: InfoArgs) {
+        todo!();
     }
 
-    fn enable(mut self, modules: Vec<String>) -> Result<()> {
+    fn enable(&mut self, modules: Vec<String>) -> Result<()> {
         let mut has_enabled = false;
-        for (name, module) in config::modules_matching_globs(&modules)? {
-            if !self.state.has_module(name) {
+        for name in config::modules_matching_globs(&modules)? {
+            let modules = ModuleSet::new(name)?;
+            if !self.state.is_module_enabled(name) {
                 has_enabled = true;
-                self.state.enable_module(&mut self.users, name, module);
+                if let Err(err) = self.state.enable_module(&mut self.users, name, &modules) {
+                    eprintln!("{} {err:?}", "error:".red());
+                }
             }
         }
         if !has_enabled {
@@ -81,12 +61,12 @@ impl App {
         self.state.save()
     }
 
-    fn disable(mut self, modules: Vec<String>) -> Result<()> {
+    fn disable(&mut self, modules: Vec<String>) -> Result<()> {
         self.state.disable_modules_matching_globs(&modules)?;
         self.state.save()
     }
 
-    fn update(mut self, modules: Vec<String>) -> Result<()> {
+    fn update(&mut self, modules: Vec<String>) -> Result<()> {
         if modules.is_empty() {
             self.state.update_all_modules(&mut self.users)?;
         } else {
@@ -96,7 +76,7 @@ impl App {
         self.state.save()
     }
 
-    fn hash(self, sources: HashSet<SourceName>) -> Result<()> {
+    fn hash(&self, sources: HashSet<SourceName>) -> Result<()> {
         self.hash_dir("Config", paths::config_sources(), &sources)?;
         self.hash_dir("Named", paths::named_sources(), &sources)?;
         Ok(())

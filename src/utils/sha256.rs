@@ -6,6 +6,7 @@ use std::{
     str::FromStr,
 };
 
+use anyhow::Result;
 use bincode::{Decode, Encode};
 use hex::{FromHex, FromHexError};
 use serde::{Deserialize, Deserializer, de};
@@ -57,7 +58,7 @@ pub trait PathHash {
     fn hash_symlink(&self) -> io::Result<Sha256Hash>;
 
     /// Creates a SHA-256 hash from a path's contents.
-    fn hash_all(&self) -> io::Result<Sha256Hash>;
+    fn hash_all(&self) -> Result<Sha256Hash>;
 }
 
 impl PathHash for Path {
@@ -71,11 +72,11 @@ impl PathHash for Path {
         Ok(Sha256::digest(self.read_link()?.to_string_lossy().as_ref()).into())
     }
 
-    fn hash_all(&self) -> io::Result<Sha256Hash> {
+    fn hash_all(&self) -> Result<Sha256Hash> {
         if self.is_symlink() {
-            return self.hash_symlink();
+            return Ok(self.hash_symlink()?);
         } else if self.is_file() {
-            return self.hash_file();
+            return Ok(self.hash_file()?);
         }
 
         let mut hasher = Sha256::new();
@@ -86,7 +87,7 @@ impl PathHash for Path {
             } else {
                 io::copy(&mut File::open(path)?, &mut hasher)?;
             }
-            Ok::<_, io::Error>(())
+            Ok(())
         })?;
         Ok(hasher.finalize().into())
     }

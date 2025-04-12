@@ -5,7 +5,7 @@ use std::{
     sync::OnceLock,
 };
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use crossterm::style::Stylize;
 use globset::GlobSet;
 use serde::Deserialize;
@@ -14,7 +14,7 @@ use crate::{
     cli::Behavior,
     module::Module,
     paths,
-    source::{info::SourceInfo, name::SourceName},
+    source::{hashable::HashableSource, name::SourceName},
     utils::{self, glob::GlobSetExt},
 };
 
@@ -27,7 +27,7 @@ struct Config {
     #[serde(skip, default)]
     sources: HashSet<SourceName>,
     #[serde(default, rename = "sources")]
-    named_sources: HashMap<SourceName, SourceInfo>,
+    named_sources: HashMap<SourceName, HashableSource>,
     #[serde(default)]
     modules: BTreeMap<String, Module>,
 }
@@ -120,16 +120,16 @@ pub fn has_source(name: &SourceName) -> bool {
     config().sources.contains(name)
 }
 
-pub fn has_named_source(name: &SourceName) -> bool {
-    config().named_sources.contains_key(name)
-}
-
-pub fn named_source(name: &SourceName) -> Option<&'static SourceInfo> {
+pub fn named_source(name: &SourceName) -> Option<&'static HashableSource> {
     config().named_sources.get(name)
 }
 
-pub fn module(name: &str) -> Option<&'static Module> {
-    config().modules.get(name)
+pub fn module(name: &str) -> Result<(&'static str, &'static Module)> {
+    config()
+        .modules
+        .get_key_value(name)
+        .map(|(name, module)| (name.as_str(), module))
+        .ok_or_else(|| anyhow!("Module isn't defined"))
 }
 
 pub fn modules() -> impl Iterator<Item = (&'static str, &'static Module)> {
@@ -139,9 +139,12 @@ pub fn modules() -> impl Iterator<Item = (&'static str, &'static Module)> {
         .map(|(name, module)| (name.as_str(), module))
 }
 
-pub fn modules_matching_globs(
-    globs: &[String],
-) -> Result<impl Iterator<Item = (&'static str, &'static Module)>, globset::Error> {
+pub fn modules_matching_globs<S>(
+    globs: &[S],
+) -> Result<impl Iterator<Item = &'static str>, globset::Error>
+where
+    S: AsRef<str>,
+{
     let globs = GlobSet::from_globs(globs)?;
-    Ok(modules().filter(move |(name, _)| globs.is_match(name)))
+    Ok(modules().filter_map(move |(name, _)| globs.is_match(name).then_some(name)))
 }

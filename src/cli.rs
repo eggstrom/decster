@@ -1,8 +1,8 @@
-use std::{collections::HashSet, path::PathBuf, str::FromStr};
+use std::{path::PathBuf, str::FromStr};
 
 use clap::{Args, Parser, Subcommand};
 
-use crate::{source::name::SourceName, state::ModuleFilter};
+use crate::source::name::SourceName;
 
 #[derive(Debug, Parser)]
 pub struct Cli {
@@ -71,16 +71,4 @@ pub struct InfoArgs {
     /// Only show disabled modules
     #[arg(long, short = 'D')]
     pub disabled: bool,
-}
-impl InfoArgs {
-    pub fn modules(self) -> (HashSet<String>, ModuleFilter) {
-        (
-            self.modules.into_iter().collect(),
-            match () {
-                _ if self.enabled => ModuleFilter::Enabled,
-                _ if self.disabled => ModuleFilter::Disabled,
-                _ => ModuleFilter::All,
-            },
-        )
-    }
 }
