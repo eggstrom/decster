@@ -10,7 +10,7 @@ use bincode::{Decode, Encode};
 use crossterm::style::Stylize;
 
 use crate::utils::{
-    output::PrettyPathExt,
+    pretty::PrettyPathExt,
     sha256::{PathHash, Sha256Hash},
 };
 

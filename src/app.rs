@@ -13,7 +13,7 @@ use crate::{
     state::State,
     users::Users,
     utils::{
-        output::{PrettyPathExt, PrettyStrSliceExt},
+        pretty::{PrettyPathExt, PrettyStrSliceExt},
         sha256::PathHash,
     },
 };

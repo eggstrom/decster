@@ -17,7 +17,7 @@ use crate::{
     users::Users,
     utils::{
         glob::GlobSetExt,
-        output::{PrettyPathExt, PrettyStrSliceExt},
+        pretty::{PrettyPathExt, PrettyStrSliceExt},
     },
 };
 

@@ -14,7 +14,7 @@ use crate::{
     paths,
     state::{State, path::PathInfo},
     users::Users,
-    utils::{self, output::PrettyPathExt, sha256::PathHash},
+    utils::{self, pretty::PrettyPathExt, sha256::PathHash},
 };
 
 use super::source::ModuleSource;
