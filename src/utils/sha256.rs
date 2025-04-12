@@ -80,11 +80,11 @@ impl PathHash for Path {
         }
 
         let mut hasher = Sha256::new();
-        super::fs::walk_dir(self, true, false, |path| {
-            hasher.update(path.to_string_lossy().as_ref());
+        super::fs::walk_dir_rel(self, true, false, |path, rel_path| {
+            hasher.update(rel_path.to_string_lossy().as_ref());
             if path.is_symlink() {
                 hasher.update(path.read_link()?.to_string_lossy().as_ref());
-            } else {
+            } else if path.is_file() {
                 io::copy(&mut File::open(path)?, &mut hasher)?;
             }
             Ok(())

@@ -5,14 +5,17 @@ use clap::Parser;
 use crossterm::style::Stylize;
 
 use crate::{
-    cli::{Cli, Command, InfoArgs},
+    cli::{Cli, Command},
     config,
     module::set::ModuleSet,
-    out, paths,
+    paths,
     source::name::SourceName,
     state::State,
     users::Users,
-    utils::sha256::PathHash,
+    utils::{
+        output::{PrettyPathExt, PrettyStrSliceExt},
+        sha256::PathHash,
+    },
 };
 
 pub struct App {
@@ -31,17 +34,14 @@ impl App {
         };
 
         match cli.command {
-            Command::Info(args) => app.info(args),
             Command::Enable { modules } => app.enable(modules)?,
             Command::Disable { modules } => app.disable(modules.into_iter().collect())?,
             Command::Update { modules } => app.update(modules)?,
+            Command::List => app.list(),
+            Command::Paths => app.paths()?,
             Command::Hash { sources } => app.hash(sources.into_iter().collect())?,
         }
         Ok(())
-    }
-
-    fn info(&self, args: InfoArgs) {
-        todo!();
     }
 
     fn enable(&mut self, modules: Vec<String>) -> Result<()> {
@@ -52,11 +52,13 @@ impl App {
                 has_enabled = true;
                 if let Err(err) = self.state.enable_module(&mut self.users, name, &modules) {
                     eprintln!("{} {err:?}", "error:".red());
+                } else {
+                    println!("Enabled {}", name.magenta());
                 }
             }
         }
         if !has_enabled {
-            bail!("Patterns didn't match any disabled modules");
+            bail!("{} didn't match any disabled modules", modules.pretty());
         }
         self.state.save()
     }
@@ -76,6 +78,31 @@ impl App {
         self.state.save()
     }
 
+    fn list(&self) {
+        for (name, _) in config::modules() {
+            let enabled = self.state.is_module_enabled(name);
+            let state = match enabled {
+                true => "Enabled".green(),
+                false => "Disabled".red(),
+            };
+            println!("{} ({state})", name.magenta());
+        }
+    }
+
+    fn paths(&self) -> Result<()> {
+        let owned_paths = self.state.owned_paths();
+        if owned_paths.len() == 0 {
+            println!("There are no owned paths");
+        }
+        for (module, paths) in self.state.owned_paths() {
+            println!("Paths owned by module {}:", module.magenta());
+            for (path, info) in paths {
+                println!("  {} ({})", path.pretty(), info.kind());
+            }
+        }
+        Ok(())
+    }
+
     fn hash(&self, sources: HashSet<SourceName>) -> Result<()> {
         self.hash_dir("Config", paths::config_sources(), &sources)?;
         self.hash_dir("Named", paths::named_sources(), &sources)?;
@@ -90,10 +117,10 @@ impl App {
             .collect();
         sources.sort_unstable();
         if !sources.is_empty() {
-            out!(0; "{} sources", text);
-        }
-        for (name, path) in sources {
-            out!(1; "{}: {}", name, path.hash_all()?)
+            println!("{} sources:", text);
+            for (name, path) in sources {
+                println!("  {}: {}", name, path.hash_all()?)
+            }
         }
         Ok(())
     }

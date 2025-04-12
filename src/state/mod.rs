@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result, bail};
 use bincode::{Decode, Encode, config::Configuration};
 use crossterm::style::Stylize;
 use globset::GlobSet;
@@ -15,7 +15,10 @@ use crate::{
     paths,
     source::{hashable::HashableSource, ident::SourceIdent},
     users::Users,
-    utils::{glob::GlobSetExt, output::PathDisplay},
+    utils::{
+        glob::GlobSetExt,
+        output::{PrettyPathExt, PrettyStrSliceExt},
+    },
 };
 
 pub mod path;
@@ -31,7 +34,7 @@ impl State {
     pub fn load() -> Result<Self> {
         let dir = paths::named_sources();
         fs::create_dir_all(dir)
-            .with_context(|| format!("Couldn't create path: {}", dir.display_dir()))?;
+            .with_context(|| format!("Couldn't create path: {}", dir.pretty()))?;
         Ok(File::open(paths::state())
             .ok()
             .and_then(|mut file| bincode::decode_from_std_read(&mut file, Self::bin_config()).ok())
@@ -63,6 +66,12 @@ impl State {
         self.paths.contains(path.as_ref())
     }
 
+    pub fn add_module(&mut self, name: &str) {
+        if !self.module_paths.contains_key(name) {
+            self.module_paths.insert(name.to_string(), Vec::new());
+        }
+    }
+
     pub fn add_source(&mut self, ident: &SourceIdent, source: &HashableSource) {
         self.sources.insert(ident.clone(), source.clone());
     }
@@ -77,16 +86,22 @@ impl State {
         }
     }
 
-    fn modules_matching_globs(&self, globs: &[String]) -> Result<Vec<String>> {
-        let globs = GlobSet::from_globs(globs)?;
+    pub fn owned_paths(&self) -> impl ExactSizeIterator<Item = (&str, &[(PathBuf, PathInfo)])> {
+        self.module_paths
+            .iter()
+            .map(|(name, paths)| (name.as_str(), paths.as_slice()))
+    }
+
+    pub fn modules_matching_globs(&self, globs: &[String]) -> Result<Vec<String>> {
+        let glob_set = GlobSet::from_globs(globs)?;
         let matches: Vec<_> = self
             .module_paths
             .keys()
-            .filter(move |name| globs.is_match(name))
+            .filter(move |name| glob_set.is_match(name))
             .cloned()
             .collect();
         if matches.is_empty() {
-            bail!("Patterns didn't match any enabled modules");
+            bail!("{} didn't match any enabled modules", globs.pretty());
         }
         Ok(matches)
     }
@@ -99,7 +114,7 @@ impl State {
     ) -> Result<()> {
         if let Err(err) = modules
             .enable(users, self, name)
-            .with_context(|| anyhow!("Couldn't enable module {}", name.magenta()))
+            .with_context(|| format!("Couldn't enable module {}", name.magenta()))
         {
             if let Err(err) = self.disable_module(name) {
                 eprintln!("{} {err:?}", "error:".red());
@@ -123,6 +138,7 @@ impl State {
             paths.remove(i);
         }
         self.module_paths.remove(name);
+        println!("Disabled {}", name.magenta());
         Ok(())
     }
 
@@ -152,6 +168,7 @@ impl State {
         if let Some(modules) = modules {
             self.enable_module(users, name, modules)?;
         }
+        println!("Updated {}", name.magenta());
         Ok(())
     }
 

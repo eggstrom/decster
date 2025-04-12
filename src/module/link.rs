@@ -6,17 +6,15 @@ use std::{
     path::Path,
 };
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, anyhow, bail};
+use crossterm::style::Stylize;
 use nix::unistd::Uid;
 
 use crate::{
     paths,
-    state::{
-        State,
-        path::{PathInfo, PathKind},
-    },
+    state::{State, path::PathInfo},
     users::Users,
-    utils::{self, output::PathDisplay, sha256::PathHash},
+    utils::{self, output::PrettyPathExt, sha256::PathHash},
 };
 
 use super::source::ModuleSource;
@@ -26,6 +24,17 @@ enum LinkKind {
     File,
     HardLink,
     Symlink,
+}
+
+impl Display for LinkKind {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            LinkKind::File => "File".green(),
+            LinkKind::HardLink => "Hard Link".cyan(),
+            LinkKind::Symlink => "Symlink".blue(),
+        }
+        .fmt(f)
+    }
 }
 
 #[derive(Eq, Ord, PartialOrd)]
@@ -78,17 +87,20 @@ impl<'a> ModuleLink<'a> {
             } else if path.is_dir() {
                 if !new_path.is_dir() {
                     fs::create_dir(&new_path)?;
-                    self.change_ownership(users, &new_path)?;
                     state.add_path(module, &new_path, PathInfo::Directory);
+                    self.change_owner(users, &new_path)?;
                 }
             } else {
                 let info = match self.kind {
                     LinkKind::File => Self::create_file(path, &new_path),
                     LinkKind::HardLink => Self::create_hard_link(path, &new_path),
                     LinkKind::Symlink => Self::create_symlink(path, &new_path),
-                }?;
-                self.change_ownership(users, &new_path)?;
+                }
+                .with_context(|| {
+                    anyhow!("Couldn't create {} ({})", new_path.pretty(), self.kind)
+                })?;
                 state.add_path(module, &new_path, info);
+                self.change_owner(users, &new_path)?;
             }
             Ok(())
         })?;
@@ -115,9 +127,10 @@ impl<'a> ModuleLink<'a> {
         Ok(PathInfo::Symlink { original })
     }
 
-    fn change_ownership(&self, users: &mut Users, path: &Path) -> io::Result<()> {
+    fn change_owner(&self, users: &mut Users, path: &Path) -> Result<()> {
         if !self.uid.is_some_and(|uid| users.is_current_uid(uid)) {
-            unix::fs::lchown(path, self.uid, None)?;
+            unix::fs::lchown(path, self.uid, None)
+                .with_context(|| format!("Couldn't change owner of {}", path.pretty()))?;
         }
         Ok(())
     }
@@ -131,11 +144,6 @@ impl PartialEq for ModuleLink<'_> {
 
 impl Display for ModuleLink<'_> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let kind = if self.path.is_dir() {
-            PathKind::Directory
-        } else {
-            PathKind::File
-        };
-        write!(f, "{} -> {}", self.path.display_kind(kind), self.source)
+        write!(f, "{} -> {}", self.path.pretty(), self.source)
     }
 }

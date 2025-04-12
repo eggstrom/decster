@@ -129,7 +129,7 @@ pub fn module(name: &str) -> Result<(&'static str, &'static Module)> {
         .modules
         .get_key_value(name)
         .map(|(name, module)| (name.as_str(), module))
-        .ok_or_else(|| anyhow!("Module isn't defined"))
+        .ok_or(anyhow!("Module isn't defined"))
 }
 
 pub fn modules() -> impl Iterator<Item = (&'static str, &'static Module)> {
@@ -145,6 +145,6 @@ pub fn modules_matching_globs<S>(
 where
     S: AsRef<str>,
 {
-    let globs = GlobSet::from_globs(globs)?;
-    Ok(modules().filter_map(move |(name, _)| globs.is_match(name).then_some(name)))
+    let glob_set = GlobSet::from_globs(globs)?;
+    Ok(modules().filter_map(move |(name, _)| glob_set.is_match(name).then_some(name)))
 }

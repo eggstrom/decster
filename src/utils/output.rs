@@ -5,7 +5,7 @@ use std::{
 
 use crossterm::style::Stylize;
 
-use crate::{paths, state::path::PathKind};
+use crate::paths;
 
 #[macro_export]
 macro_rules! out_inner {
@@ -52,9 +52,9 @@ macro_rules! out {
     ($indent:expr, R; $($msg:expr),+ $(; $($info:expr),+)?) => { $crate::out_inner!($indent, Red;    $($msg),+ $(; $($info),+)?) };
 }
 
-pub struct DisplayFile<'a>(&'a Path);
+pub struct PrettyPath<'a>(&'a Path);
 
-impl Display for DisplayFile<'_> {
+impl Display for PrettyPath<'_> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         if let Some(file) = self.0.file_name() {
             if let Some(path) = self.0.parent() {
@@ -69,44 +69,50 @@ impl Display for DisplayFile<'_> {
     }
 }
 
-pub struct DisplayDir<'a>(&'a Path);
+pub trait PrettyPathExt {
+    fn pretty(&self) -> PrettyPath;
+}
 
-impl Display for DisplayDir<'_> {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{}{}", self.0.display_file(), "/".magenta())
+impl PrettyPathExt for Path {
+    fn pretty(&self) -> PrettyPath {
+        PrettyPath(self)
     }
 }
 
-pub struct DisplayKind<'a> {
-    path: &'a Path,
-    kind: PathKind,
-}
+pub struct PrettyStrSlice<'a, S>(&'a [S])
+where
+    S: AsRef<str>;
 
-impl Display for DisplayKind<'_> {
+impl<S> Display for PrettyStrSlice<'_, S>
+where
+    S: AsRef<str>,
+{
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self.kind {
-            PathKind::Directory => self.path.display_dir().fmt(f),
-            _ => self.path.display_file().fmt(f),
+        for (i, item) in self.0.iter().enumerate() {
+            write!(f, "'{}'", item.as_ref().yellow())?;
+            match self.0.len().checked_sub(2) {
+                Some(x) if i < x => ", ".fmt(f)?,
+                Some(x) if i == x => " and ".fmt(f)?,
+                _ => (),
+            };
         }
+        Ok(())
     }
 }
 
-pub trait PathDisplay {
-    fn display_file(&self) -> DisplayFile;
-    fn display_dir(&self) -> DisplayDir;
-    fn display_kind(&self, kind: PathKind) -> DisplayKind;
+pub trait PrettyStrSliceExt<S>
+where
+    S: AsRef<str>,
+{
+    fn pretty(&self) -> PrettyStrSlice<S>;
 }
 
-impl PathDisplay for Path {
-    fn display_file(&self) -> DisplayFile {
-        DisplayFile(self)
-    }
-
-    fn display_dir(&self) -> DisplayDir {
-        DisplayDir(self)
-    }
-
-    fn display_kind(&self, kind: PathKind) -> DisplayKind {
-        DisplayKind { path: self, kind }
+impl<S, T> PrettyStrSliceExt<S> for T
+where
+    T: AsRef<[S]>,
+    S: AsRef<str>,
+{
+    fn pretty(&self) -> PrettyStrSlice<S> {
+        PrettyStrSlice(self.as_ref())
     }
 }

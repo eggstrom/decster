@@ -1,4 +1,5 @@
 use std::{
+    fmt::{self, Display, Formatter},
     fs,
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
@@ -8,7 +9,10 @@ use anyhow::Result;
 use bincode::{Decode, Encode};
 use crossterm::style::Stylize;
 
-use crate::utils::sha256::{PathHash, Sha256Hash};
+use crate::utils::{
+    output::PrettyPathExt,
+    sha256::{PathHash, Sha256Hash},
+};
 
 #[derive(Decode, Encode)]
 pub enum PathInfo {
@@ -64,10 +68,18 @@ impl PathInfo {
                 _ => fs::remove_file(path)?,
             },
             PathState::Changed => {
-                eprintln!("{} Skipped {} (File has changed)", "info:".yellow(), path.display());
+                eprintln!(
+                    "{} Skipped {} (File has changed)",
+                    "info:".yellow(),
+                    path.pretty()
+                );
             }
             PathState::Missing => {
-                eprintln!("{} Skipped {} (File is missing)", "info:".yellow(), path.display());
+                eprintln!(
+                    "{} Skipped {} (File is missing)",
+                    "info:".yellow(),
+                    path.pretty()
+                );
             }
         }
         Ok(())
@@ -79,6 +91,18 @@ pub enum PathKind {
     File,
     HardLink,
     Symlink,
+}
+
+impl Display for PathKind {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            PathKind::Directory => "Directory".grey(),
+            PathKind::File => "File".green(),
+            PathKind::HardLink => "HardLink".cyan(),
+            PathKind::Symlink => "Symlink".blue(),
+        }
+        .fmt(f)
+    }
 }
 
 pub enum PathState {

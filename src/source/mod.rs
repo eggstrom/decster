@@ -27,13 +27,13 @@ pub enum Source {
 impl Source {
     pub fn fetch(&self, source_path: &Path) -> Result<()> {
         if source_path.exists() || source_path.is_symlink() {
-            utils::fs::remove_all(&source_path)?;
+            utils::fs::remove_all(source_path)?;
         }
 
         match self {
-            Source::Text(text) => self.fetch_text(&source_path, text),
-            Source::Symlink(path) => self.fetch_symlink(&source_path, path),
-            Source::Path(path) => self.fetch_path(&source_path, path),
+            Source::Text(text) => self.fetch_text(source_path, text),
+            Source::Symlink(path) => self.fetch_symlink(source_path, path),
+            Source::Path(path) => self.fetch_path(source_path, path),
         }
     }
 

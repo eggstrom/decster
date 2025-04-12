@@ -12,7 +12,7 @@ use serde::{
 };
 use thiserror::Error;
 
-use crate::utils::output::PathDisplay;
+use crate::utils::output::PrettyPathExt;
 
 use super::name::{ParseSourceNameError, SourceName};
 
@@ -43,7 +43,7 @@ impl SourcePath {
 impl Display for SourcePath {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match &self.path {
-            Some(path) => write!(f, "{}/{}", self.name, path.display_file()),
+            Some(path) => write!(f, "{}/{}", self.name, path.pretty()),
             None => self.name.fmt(f),
         }
     }

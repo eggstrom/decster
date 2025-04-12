@@ -12,7 +12,7 @@ use crate::{config, state::State, users::Users};
 use super::{Module, link::ModuleLink, source::ModuleSource};
 
 pub struct ModuleSet {
-    modules: Vec<&'static Module>,
+    modules: Vec<(&'static str, &'static Module)>,
 }
 
 impl ModuleSet {
@@ -20,7 +20,7 @@ impl ModuleSet {
         let mut modules = IndexMap::new();
         Self::new_inner(name, &mut modules)?;
         Ok(ModuleSet {
-            modules: modules.into_values().collect(),
+            modules: modules.into_iter().collect(),
         })
     }
 
@@ -40,7 +40,7 @@ impl ModuleSet {
         users: &mut Users,
     ) -> Result<impl ExactSizeIterator<Item = ModuleLink> + use<'_>> {
         let mut links = BTreeSet::new();
-        for module in self.modules.iter() {
+        for (_, module) in self.modules.iter() {
             let uid = module.user.as_ref().map(|u| users.uid(u)).transpose()?;
             Self::links_inner(uid, &module.files, &mut links, ModuleLink::file)?;
             Self::links_inner(uid, &module.hard_links, &mut links, ModuleLink::hard_link)?;
@@ -68,6 +68,7 @@ impl ModuleSet {
     }
 
     pub fn enable(&self, users: &mut Users, state: &mut State, name: &str) -> Result<()> {
+        state.add_module(name);
         for link in self.links(users)? {
             link.create(users, state, name)?
         }

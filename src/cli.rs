@@ -33,11 +33,8 @@ pub struct Behavior {
 
 #[derive(Clone, Debug, Subcommand)]
 pub enum Command {
-    /// Display information
-    #[command(alias = "i")]
-    Info(InfoArgs),
-    /// Enable modules
     #[command(alias = "e")]
+    /// Enable modules
     Enable {
         #[arg(required = true, value_name = "PATTERNS")]
         modules: Vec<String>,
@@ -54,21 +51,16 @@ pub enum Command {
         #[arg(value_name = "PATTERNS")]
         modules: Vec<String>,
     },
+    /// Show module definitions
+    #[command(alias = "l")]
+    List,
+    /// Show owned paths
+    #[command(alias = "p")]
+    Paths,
     /// Show hashes of fetched sources
     #[command(alias = "h")]
     Hash {
         #[arg(value_parser = SourceName::from_str)]
         sources: Vec<SourceName>,
     },
-}
-
-#[derive(Args, Clone, Debug)]
-pub struct InfoArgs {
-    pub modules: Vec<String>,
-    /// Only show enabled modules
-    #[arg(long, short = 'E', conflicts_with = "disabled")]
-    pub enabled: bool,
-    /// Only show disabled modules
-    #[arg(long, short = 'D')]
-    pub disabled: bool,
 }

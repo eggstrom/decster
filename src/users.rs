@@ -33,7 +33,7 @@ impl Users {
             .get(name)
             .unwrap()
             .as_ref()
-            .ok_or_else(|| anyhow!("User doesn't exist"))
+            .ok_or(anyhow!("User doesn't exist"))
     }
 
     pub fn uid(&mut self, name: &str) -> Result<Uid> {
