@@ -123,7 +123,7 @@ impl Env {
         &self.state
     }
 
-    fn tildefy_with<'a>(&self, path: &'a Path, home: &Path) -> Cow<'a, Path> {
+    fn tildefy_inner<'a>(path: &'a Path, home: &Path) -> Cow<'a, Path> {
         match path.strip_prefix(home) {
             Ok(path) => match path.parent() {
                 None => Cow::Borrowed(Path::new(Self::TILDE)),
@@ -133,18 +133,53 @@ impl Env {
         }
     }
 
-    pub fn tildefy<'a>(&self, path: &'a Path) -> Cow<'a, Path> {
-        self.tildefy_with(path, self.home())
-    }
-
-    fn untildefy_with<'a>(&self, path: &'a Path, home: &Path) -> Cow<'a, Path> {
+    fn untildefy_inner<'a>(path: &'a Path, home: &Path) -> Cow<'a, Path> {
         match path.strip_prefix(Self::TILDE) {
             Ok(path) => Cow::Owned(home.join(path)),
             Err(_) => Cow::Borrowed(path),
         }
     }
 
+    pub fn tildefy<'a>(&self, path: &'a Path) -> Cow<'a, Path> {
+        Self::tildefy_inner(path, self.home())
+    }
+
     pub fn untildefy<'a>(&self, path: &'a Path) -> Cow<'a, Path> {
-        self.untildefy_with(path, self.home())
+        Self::untildefy_inner(path, self.home())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn paths(home: &Path) -> Vec<(&Path, PathBuf)> {
+        let home = home.to_string_lossy();
+        [
+            ("~", format!("{home}")),
+            ("~/", format!("{home}/")),
+            ("~/foo", format!("{home}/foo")),
+            (" ~/foo", " ~/foo".to_string()),
+            ("~ /foo", "~ /foo".to_string()),
+            ("~bar/foo", "~bar/foo".to_string()),
+        ]
+        .map(|(tilde, no_tilde)| (Path::new(tilde), PathBuf::from(no_tilde)))
+        .into()
+    }
+
+    #[test]
+    fn tildefy() {
+        let home = dirs::home_dir().unwrap();
+        for (tilde, untilde) in paths(&home) {
+            assert_eq!(Env::tildefy_inner(&untilde, &home), tilde);
+        }
+    }
+
+    #[test]
+    fn untildefy() {
+        let home = dirs::home_dir().unwrap();
+        for (tilde, no_tilde) in paths(&home) {
+            assert_eq!(Env::untildefy_inner(tilde, &home), no_tilde);
+        }
     }
 }
