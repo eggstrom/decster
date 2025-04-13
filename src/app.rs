@@ -12,10 +12,7 @@ use crate::{
     source::name::SourceName,
     state::State,
     users::Users,
-    utils::{
-        pretty::{PrettyPathExt, PrettyStrSliceExt},
-        sha256::PathHash,
-    },
+    utils::{pretty::Pretty, sha256::PathHash},
 };
 
 pub struct App {
@@ -58,7 +55,10 @@ impl App {
             }
         }
         if !has_enabled {
-            bail!("{} didn't match any disabled modules", modules.pretty());
+            bail!(
+                "{} didn't match any disabled modules",
+                modules.as_slice().pretty()
+            );
         }
         self.state.save()
     }

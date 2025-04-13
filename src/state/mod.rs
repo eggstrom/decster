@@ -15,10 +15,7 @@ use crate::{
     paths,
     source::{hashable::HashableSource, ident::SourceIdent},
     users::Users,
-    utils::{
-        glob::GlobSetExt,
-        pretty::{PrettyPathExt, PrettyStrSliceExt},
-    },
+    utils::{glob::GlobSetExt, pretty::Pretty},
 };
 
 pub mod path;

@@ -12,7 +12,7 @@ use serde::{
 };
 use thiserror::Error;
 
-use crate::utils::pretty::PrettyPathExt;
+use crate::utils::pretty::Pretty;
 
 use super::name::{ParseSourceNameError, SourceName};
 

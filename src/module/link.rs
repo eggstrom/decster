@@ -12,9 +12,9 @@ use nix::unistd::Uid;
 
 use crate::{
     paths,
-    state::{State, path::PathInfo},
+    state::{path::PathInfo, State},
     users::Users,
-    utils::{self, pretty::PrettyPathExt, sha256::PathHash},
+    utils::{self, pretty::Pretty, sha256::PathHash},
 };
 
 use super::source::ModuleSource;
