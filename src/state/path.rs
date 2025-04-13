@@ -66,10 +66,13 @@ impl PathInfo {
     {
         let path = path.as_ref();
         match self.state(path) {
-            PathState::Owned => match self.kind() {
-                PathKind::Directory => fs::remove_dir(path)?,
-                _ => fs::remove_file(path)?,
-            },
+            PathState::Owned => {
+                if let PathKind::Directory = self.kind() {
+                    let _ = fs::remove_dir(path);
+                } else {
+                    fs::remove_file(path)?;
+                }
+            }
             PathState::Changed => {
                 eprintln!(
                     "{} Skipped {} (File has changed)",
