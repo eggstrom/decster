@@ -5,12 +5,10 @@ use std::{
 
 use crossterm::style::Stylize;
 
-use crate::paths;
-
 pub trait Pretty {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result;
 
-    fn pretty<'a>(&'a self) -> PrettyRef<'a, Self> {
+    fn pretty(&self) -> PrettyRef<'_, Self> {
         PrettyRef(self)
     }
 }
@@ -32,7 +30,7 @@ impl Pretty for Path {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         if let Some(file) = self.file_name() {
             if let Some(path) = self.parent() {
-                paths::tildefy(path).display().fmt(f)?;
+                path.display().fmt(f)?;
                 if path.parent().is_some() {
                     "/".fmt(f)?;
                 }
@@ -48,8 +46,8 @@ where
     T: AsRef<str>,
 {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        for (i, item) in self.iter().enumerate() {
-            write!(f, "'{}'", item.as_ref().yellow())?;
+        for (i, string) in self.iter().enumerate() {
+            write!(f, "'{}'", string.as_ref().yellow())?;
             match self.len().checked_sub(2) {
                 Some(x) if i < x => ", ".fmt(f)?,
                 Some(x) if i == x => " and ".fmt(f)?,

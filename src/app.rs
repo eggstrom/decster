@@ -7,28 +7,25 @@ use crossterm::style::Stylize;
 use crate::{
     cli::{Cli, Command},
     config,
+    env::Env,
     module::set::ModuleSet,
-    paths,
     source::name::SourceName,
     state::State,
-    users::Users,
     utils::{pretty::Pretty, sha256::PathHash},
 };
 
 pub struct App {
-    users: Users,
+    env: Env,
     state: State,
 }
 
 impl App {
     pub fn run() -> Result<()> {
         let cli = Cli::parse();
-        paths::load(cli.config)?;
-        config::load(cli.behavior)?;
-        let mut app = App {
-            users: Users::new(),
-            state: State::load()?,
-        };
+        let env = Env::load(cli.config)?;
+        config::load(&env, cli.behavior)?;
+        let state = State::load(&env)?;
+        let mut app = App { env, state };
 
         match cli.command {
             Command::Enable { modules } => app.enable(modules)?,
@@ -47,7 +44,7 @@ impl App {
             let modules = ModuleSet::new(name)?;
             if !self.state.is_module_enabled(name) {
                 has_enabled = true;
-                if let Err(err) = self.state.enable_module(&mut self.users, name, &modules) {
+                if let Err(err) = self.state.enable_module(&mut self.env, name, &modules) {
                     eprintln!("{} {err:?}", "error:".red());
                 } else {
                     println!("Enabled {}", name.magenta());
@@ -55,27 +52,26 @@ impl App {
             }
         }
         if !has_enabled {
-            bail!(
-                "{} didn't match any disabled modules",
-                modules.as_slice().pretty()
-            );
+            let modules = modules.as_slice();
+            bail!("{} didn't match any disabled modules", modules.pretty());
         }
-        self.state.save()
+        self.state.save(&self.env)
     }
 
     fn disable(&mut self, modules: Vec<String>) -> Result<()> {
-        self.state.disable_modules_matching_globs(&modules)?;
-        self.state.save()
+        self.state
+            .disable_modules_matching_globs(&self.env, &modules)?;
+        self.state.save(&self.env)
     }
 
     fn update(&mut self, modules: Vec<String>) -> Result<()> {
         if modules.is_empty() {
-            self.state.update_all_modules(&mut self.users)?;
+            self.state.update_all_modules(&mut self.env)?;
         } else {
             self.state
-                .update_modules_matching_globs(&mut self.users, &modules)?;
+                .update_modules_matching_globs(&mut self.env, &modules)?;
         }
-        self.state.save()
+        self.state.save(&self.env)
     }
 
     fn list(&self) {
@@ -97,15 +93,15 @@ impl App {
         for (module, paths) in self.state.owned_paths() {
             println!("Paths owned by module {}:", module.magenta());
             for (path, info) in paths {
-                println!("  {} ({})", path.pretty(), info.kind());
+                println!("  {} ({})", self.env.tildefy(path).pretty(), info.kind());
             }
         }
         Ok(())
     }
 
     fn hash(&self, sources: HashSet<SourceName>) -> Result<()> {
-        self.hash_dir("Config", paths::config_sources(), &sources)?;
-        self.hash_dir("Named", paths::named_sources(), &sources)?;
+        self.hash_dir("Config", self.env.config_sources(), &sources)?;
+        self.hash_dir("Named", self.env.named_sources(), &sources)?;
         Ok(())
     }
 

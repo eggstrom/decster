@@ -9,9 +9,12 @@ use anyhow::Result;
 use bincode::{Decode, Encode};
 use crossterm::style::Stylize;
 
-use crate::utils::{
-    pretty::Pretty,
-    sha256::{PathHash, Sha256Hash},
+use crate::{
+    env::Env,
+    utils::{
+        pretty::Pretty,
+        sha256::{PathHash, Sha256Hash},
+    },
 };
 
 #[derive(Decode, Encode)]
@@ -57,7 +60,7 @@ impl PathInfo {
         }
     }
 
-    pub fn remove_if_owned<P>(&self, path: P) -> Result<()>
+    pub fn remove_if_owned<P>(&self, env: &Env, path: P) -> Result<()>
     where
         P: AsRef<Path>,
     {
@@ -71,14 +74,14 @@ impl PathInfo {
                 eprintln!(
                     "{} Skipped {} (File has changed)",
                     "info:".yellow(),
-                    path.pretty()
+                    env.tildefy(path).display()
                 );
             }
             PathState::Missing => {
                 eprintln!(
                     "{} Skipped {} (File is missing)",
                     "info:".yellow(),
-                    path.pretty()
+                    env.tildefy(path).pretty()
                 );
             }
         }

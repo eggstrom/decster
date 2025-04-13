@@ -6,10 +6,9 @@ mod app;
 mod cli;
 mod config;
 mod module;
-mod paths;
+mod env;
 mod source;
 mod state;
-mod users;
 mod utils;
 
 fn main() {

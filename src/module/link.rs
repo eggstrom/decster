@@ -11,9 +11,8 @@ use crossterm::style::Stylize;
 use nix::unistd::Uid;
 
 use crate::{
-    paths,
-    state::{path::PathInfo, State},
-    users::Users,
+    env::Env,
+    state::{State, path::PathInfo},
     utils::{self, pretty::Pretty, sha256::PathHash},
 };
 
@@ -73,11 +72,11 @@ impl<'a> ModuleLink<'a> {
         }
     }
 
-    pub fn create(&self, users: &mut Users, state: &mut State, module: &str) -> Result<()> {
-        let source_path = self.source.fetch(state, module, self.path)?;
+    pub fn create(&self, env: &mut Env, state: &mut State, module: &str) -> Result<()> {
+        let source_path = self.source.fetch(env, state, module, self.path)?;
 
         utils::fs::walk_dir_rel(source_path, false, false, |path, rel_path| {
-            let mut new_path = paths::untildefy(self.path);
+            let mut new_path = env.untildefy(self.path);
             if rel_path.parent().is_some() {
                 new_path = Cow::Owned(new_path.join(rel_path));
             }
@@ -88,7 +87,7 @@ impl<'a> ModuleLink<'a> {
                 if !new_path.is_dir() {
                     fs::create_dir(&new_path)?;
                     state.add_path(module, &new_path, PathInfo::Directory);
-                    self.change_owner(users, &new_path)?;
+                    self.change_owner(env, &new_path)?;
                 }
             } else {
                 let info = match self.kind {
@@ -97,10 +96,11 @@ impl<'a> ModuleLink<'a> {
                     LinkKind::Symlink => Self::create_symlink(path, &new_path),
                 }
                 .with_context(|| {
+                    let new_path = env.tildefy(new_path.as_ref());
                     anyhow!("Couldn't create {} ({})", new_path.pretty(), self.kind)
                 })?;
                 state.add_path(module, &new_path, info);
-                self.change_owner(users, &new_path)?;
+                self.change_owner(env, &new_path)?;
             }
             Ok(())
         })?;
@@ -127,10 +127,11 @@ impl<'a> ModuleLink<'a> {
         Ok(PathInfo::Symlink { original })
     }
 
-    fn change_owner(&self, users: &mut Users, path: &Path) -> Result<()> {
-        if !self.uid.is_some_and(|uid| users.is_current_uid(uid)) {
-            unix::fs::lchown(path, self.uid, None)
-                .with_context(|| format!("Couldn't change owner of {}", path.pretty()))?;
+    fn change_owner(&self, env: &mut Env, path: &Path) -> Result<()> {
+        if !self.uid.is_some_and(|uid| env.is_current_uid(uid)) {
+            unix::fs::lchown(path, self.uid, None).with_context(|| {
+                format!("Couldn't change owner of {}", env.tildefy(path).pretty())
+            })?;
         }
         Ok(())
     }
@@ -139,11 +140,5 @@ impl<'a> ModuleLink<'a> {
 impl PartialEq for ModuleLink<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.path == other.path
-    }
-}
-
-impl Display for ModuleLink<'_> {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{} -> {}", self.path.pretty(), self.source)
     }
 }

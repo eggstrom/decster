@@ -11,18 +11,18 @@ use crossterm::style::Stylize;
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::paths;
+use crate::env::Env;
 
 #[derive(Clone, Debug, Decode, Deserialize, Encode, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SourceName(String);
 
 impl SourceName {
-    pub fn config_path(&self) -> PathBuf {
-        paths::config_sources().join(self)
+    pub fn config_path(&self, env: &Env) -> PathBuf {
+        env.config_sources().join(self)
     }
 
-    pub fn named_path(&self) -> PathBuf {
-        paths::named_sources().join(self)
+    pub fn named_path(&self, env: &Env) -> PathBuf {
+        env.named_sources().join(self)
     }
 }
 

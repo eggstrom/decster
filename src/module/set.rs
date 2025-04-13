@@ -7,7 +7,7 @@ use anyhow::{Result, bail};
 use indexmap::IndexMap;
 use nix::unistd::Uid;
 
-use crate::{config, state::State, users::Users};
+use crate::{config, env::Env, state::State};
 
 use super::{Module, link::ModuleLink, source::ModuleSource};
 
@@ -37,11 +37,11 @@ impl ModuleSet {
 
     pub fn links(
         &self,
-        users: &mut Users,
+        env: &mut Env,
     ) -> Result<impl ExactSizeIterator<Item = ModuleLink> + use<'_>> {
         let mut links = BTreeSet::new();
         for (_, module) in self.modules.iter() {
-            let uid = module.user.as_ref().map(|u| users.uid(u)).transpose()?;
+            let uid = module.user.as_ref().map(|u| env.uid(u)).transpose()?;
             Self::links_inner(uid, &module.files, &mut links, ModuleLink::file)?;
             Self::links_inner(uid, &module.hard_links, &mut links, ModuleLink::hard_link)?;
             Self::links_inner(uid, &module.symlinks, &mut links, ModuleLink::symlink)?;
@@ -67,10 +67,10 @@ impl ModuleSet {
         Ok(())
     }
 
-    pub fn enable(&self, users: &mut Users, state: &mut State, name: &str) -> Result<()> {
+    pub fn enable(&self, env: &mut Env, state: &mut State, name: &str) -> Result<()> {
         state.add_module(name);
-        for link in self.links(users)? {
-            link.create(users, state, name)?
+        for link in self.links(env)? {
+            link.create(env, state, name)?
         }
         Ok(())
     }

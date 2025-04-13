@@ -6,7 +6,7 @@ use std::{
 use bincode::{Decode, Encode};
 use sha2::{Digest, Sha256};
 
-use crate::{paths, utils::sha256::Sha256Hash};
+use crate::{env::Env, utils::sha256::Sha256Hash};
 
 use super::name::SourceName;
 
@@ -28,10 +28,10 @@ impl SourceIdent {
         SourceIdent::Hash(hasher.finalize().into())
     }
 
-    pub fn path(&self) -> PathBuf {
+    pub fn path(&self, env: &Env) -> PathBuf {
         match self {
-            SourceIdent::Name(name) => paths::named_sources().join(name),
-            SourceIdent::Hash(hash) => paths::unnamed_sources().join(hash.to_string()),
+            SourceIdent::Name(name) => env.named_sources().join(name),
+            SourceIdent::Hash(hash) => env.unnamed_sources().join(hash.to_string()),
         }
     }
 }
