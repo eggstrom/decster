@@ -8,7 +8,7 @@ use std::{
 use anyhow::{Result, anyhow};
 use nix::unistd::{self, Uid};
 
-pub struct User {
+struct User {
     uid: Uid,
     home: PathBuf,
 }

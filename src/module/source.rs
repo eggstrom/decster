@@ -51,7 +51,7 @@ impl ModuleSource {
 
         if let Some((ident, source)) = info {
             if !state.is_source_fetched(env, &ident, source) {
-                source.fetch(&path)?;
+                source.fetch(env, &path)?;
                 state.add_source(&ident, source);
             }
         }

@@ -1,5 +1,4 @@
 use std::{
-    fmt::{self, Display, Formatter},
     fs,
     os::unix,
     path::{Path, PathBuf},
@@ -9,7 +8,7 @@ use anyhow::Result;
 use bincode::{Decode, Encode};
 use serde::Deserialize;
 
-use crate::utils;
+use crate::{env::Env, utils};
 
 pub mod hashable;
 pub mod ident;
@@ -25,7 +24,7 @@ pub enum Source {
 }
 
 impl Source {
-    pub fn fetch(&self, source_path: &Path) -> Result<()> {
+    pub fn fetch(&self, env: &Env, source_path: &Path) -> Result<()> {
         if source_path.exists() || source_path.is_symlink() {
             utils::fs::remove_all(source_path)?;
         }
@@ -33,7 +32,7 @@ impl Source {
         match self {
             Source::Text(text) => self.fetch_text(source_path, text),
             Source::Symlink(path) => self.fetch_symlink(source_path, path),
-            Source::Path(path) => self.fetch_path(source_path, path),
+            Source::Path(path) => self.fetch_path(source_path, &env.untildefy(path)),
         }
     }
 
@@ -47,16 +46,5 @@ impl Source {
 
     fn fetch_path(&self, source_path: &Path, path: &Path) -> Result<()> {
         utils::fs::copy_all(path, source_path)
-    }
-}
-
-impl Display for Source {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            Source::Text(_) => "Text",
-            Source::Symlink(_) => "Symlink",
-            Source::Path(_) => "Path",
-        }
-        .fmt(f)
     }
 }

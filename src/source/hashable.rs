@@ -1,13 +1,13 @@
-use std::{
-    fmt::{self, Display, Formatter},
-    path::Path,
-};
+use std::path::Path;
 
 use anyhow::{Context, Result, bail};
 use bincode::{Decode, Encode};
 use serde::Deserialize;
 
-use crate::utils::sha256::{PathHash, Sha256Hash};
+use crate::{
+    env::Env,
+    utils::sha256::{PathHash, Sha256Hash},
+};
 
 use super::Source;
 
@@ -19,19 +19,13 @@ pub struct HashableSource {
 }
 
 impl HashableSource {
-    pub fn fetch(&self, path: &Path) -> Result<()> {
-        self.source.fetch(path)?;
+    pub fn fetch(&self, env: &Env, path: &Path) -> Result<()> {
+        self.source.fetch(env, path)?;
         if let Some(hash) = &self.hash {
             if path.hash_all().context("Couldn't calculate hash")? == *hash {
                 bail!("Contents don't match hash");
             }
         }
         Ok(())
-    }
-}
-
-impl Display for HashableSource {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        self.source.fmt(f)
     }
 }
