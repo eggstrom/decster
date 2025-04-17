@@ -28,7 +28,7 @@ impl ModuleSet {
         if !modules.contains_key(name) {
             let (name, module) = config::module(name)?;
             modules.insert(name, module);
-            for import in module.imports.iter() {
+            for import in config::modules_matching_globs(&module.imports)? {
                 Self::new_inner(import, modules)?;
             }
         }

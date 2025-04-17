@@ -139,11 +139,12 @@ pub fn modules() -> impl Iterator<Item = (&'static str, &'static Module)> {
         .map(|(name, module)| (name.as_str(), module))
 }
 
-pub fn modules_matching_globs<S>(
-    globs: &[S],
+pub fn modules_matching_globs<I>(
+    globs: I,
 ) -> Result<impl Iterator<Item = &'static str>, globset::Error>
 where
-    S: AsRef<str>,
+    I: IntoIterator,
+    I::Item: AsRef<str>,
 {
     let glob_set = GlobSet::from_globs(globs)?;
     Ok(modules().filter_map(move |(name, _)| glob_set.is_match(name).then_some(name)))
