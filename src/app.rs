@@ -10,7 +10,7 @@ use crate::{
     module::set::ModuleSet,
     source::name::SourceName,
     state::State,
-    utils::{pretty::Pretty, sha256::PathHash},
+    utils::{pretty::Pretty, sha256::Sha256Hash},
 };
 
 pub struct App {
@@ -111,7 +111,7 @@ impl App {
         if !sources.is_empty() {
             println!("{} sources:", text);
             for (name, path) in sources {
-                println!("  {}: {}", name, path.hash_all()?)
+                println!("  {}: {}", name, Sha256Hash::from_path(&path)?)
             }
         }
         Ok(())

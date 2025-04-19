@@ -15,6 +15,41 @@ use sha2::{Digest, Sha256};
 #[derive(Clone, Decode, Encode, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct Sha256Hash([u8; 32]);
 
+impl Sha256Hash {
+    /// Creates a SHA-256 hash from a file's contents.
+    pub fn from_file(path: &Path) -> io::Result<Sha256Hash> {
+        let mut hasher = Sha256::new();
+        io::copy(&mut File::open(path)?, &mut hasher)?;
+        Ok(hasher.finalize().into())
+    }
+
+    /// Creates a SHA-256 hash from a symlink.
+    pub fn from_symlink(path: &Path) -> io::Result<Sha256Hash> {
+        Ok(Sha256::digest(path.read_link()?.to_string_lossy().as_ref()).into())
+    }
+
+    /// Creates a SHA-256 hash from a path's contents.
+    pub fn from_path(path: &Path) -> Result<Sha256Hash> {
+        if path.is_symlink() {
+            return Ok(Self::from_symlink(path)?);
+        } else if path.is_file() {
+            return Ok(Self::from_file(path)?);
+        }
+
+        let mut hasher = Sha256::new();
+        super::fs::walk_dir_rel(path, true, false, |path, rel_path| {
+            hasher.update(rel_path.to_string_lossy().as_ref());
+            if path.is_symlink() {
+                hasher.update(path.read_link()?.to_string_lossy().as_ref());
+            } else if path.is_file() {
+                io::copy(&mut File::open(path)?, &mut hasher)?;
+            }
+            Ok(())
+        })?;
+        Ok(hasher.finalize().into())
+    }
+}
+
 impl<T> From<T> for Sha256Hash
 where
     T: Into<[u8; 32]>,
@@ -47,49 +82,6 @@ impl<'de> Deserialize<'de> for Sha256Hash {
         D: Deserializer<'de>,
     {
         Sha256Hash::from_str(&String::deserialize(deserializer)?).map_err(de::Error::custom)
-    }
-}
-
-pub trait PathHash {
-    /// Creates a SHA-256 hash from a file's contents.
-    fn hash_file(&self) -> io::Result<Sha256Hash>;
-
-    /// Creates a SHA-256 hash from a symlink.
-    fn hash_symlink(&self) -> io::Result<Sha256Hash>;
-
-    /// Creates a SHA-256 hash from a path's contents.
-    fn hash_all(&self) -> Result<Sha256Hash>;
-}
-
-impl PathHash for Path {
-    fn hash_file(&self) -> io::Result<Sha256Hash> {
-        let mut hasher = Sha256::new();
-        io::copy(&mut File::open(self)?, &mut hasher)?;
-        Ok(hasher.finalize().into())
-    }
-
-    fn hash_symlink(&self) -> io::Result<Sha256Hash> {
-        Ok(Sha256::digest(self.read_link()?.to_string_lossy().as_ref()).into())
-    }
-
-    fn hash_all(&self) -> Result<Sha256Hash> {
-        if self.is_symlink() {
-            return Ok(self.hash_symlink()?);
-        } else if self.is_file() {
-            return Ok(self.hash_file()?);
-        }
-
-        let mut hasher = Sha256::new();
-        super::fs::walk_dir_rel(self, true, false, |path, rel_path| {
-            hasher.update(rel_path.to_string_lossy().as_ref());
-            if path.is_symlink() {
-                hasher.update(path.read_link()?.to_string_lossy().as_ref());
-            } else if path.is_file() {
-                io::copy(&mut File::open(path)?, &mut hasher)?;
-            }
-            Ok(())
-        })?;
-        Ok(hasher.finalize().into())
     }
 }
 

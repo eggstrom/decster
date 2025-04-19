@@ -1,6 +1,5 @@
 use std::{
     borrow::Cow,
-    fmt::{self, Display, Formatter},
     fs, io,
     os::unix::{self, fs::MetadataExt},
     path::Path,
@@ -9,31 +8,24 @@ use std::{
 
 use anyhow::{Context, Result, anyhow, bail};
 use crossterm::style::Stylize;
+use derive_more::Display;
 
 use crate::{
     env::{self, User},
     state::{State, path::PathInfo},
-    utils::{self, pretty::Pretty, sha256::PathHash},
+    utils::{self, pretty::Pretty, sha256::Sha256Hash},
 };
 
 use super::source::ModuleSource;
 
-#[derive(Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Display, Eq, Ord, PartialEq, PartialOrd)]
 enum LinkKind {
+    #[display("{}", "File".green())]
     File,
+    #[display("{}", "Hard Link".cyan())]
     HardLink,
+    #[display("{}", "Symlink".blue())]
     Symlink,
-}
-
-impl Display for LinkKind {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            LinkKind::File => "File".green(),
-            LinkKind::HardLink => "Hard Link".cyan(),
-            LinkKind::Symlink => "Symlink".blue(),
-        }
-        .fmt(f)
-    }
 }
 
 #[derive(Eq, Ord, PartialOrd)]
@@ -112,14 +104,14 @@ impl<'a> ModuleLink<'a> {
 
     fn create_file(from: &Path, to: &Path) -> io::Result<PathInfo> {
         let size = from.symlink_metadata()?.size();
-        let hash = from.hash_file()?;
+        let hash = Sha256Hash::from_file(from)?;
         utils::fs::copy(from, to)?;
         Ok(PathInfo::File { size, hash })
     }
 
     fn create_hard_link(original: &Path, link: &Path) -> io::Result<PathInfo> {
         let size = original.symlink_metadata()?.size();
-        let hash = original.hash_file()?;
+        let hash = Sha256Hash::from_file(original)?;
         fs::hard_link(original, link)?;
         Ok(PathInfo::HardLink { size, hash })
     }

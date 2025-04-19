@@ -11,10 +11,7 @@ use crossterm::style::Stylize;
 
 use crate::{
     env,
-    utils::{
-        pretty::Pretty,
-        sha256::{PathHash, Sha256Hash},
-    },
+    utils::{pretty::Pretty, sha256::Sha256Hash},
 };
 
 #[derive(Decode, Encode)]
@@ -44,10 +41,12 @@ impl PathInfo {
             if match self {
                 PathInfo::Directory => path.is_dir(),
                 PathInfo::File { size, hash } => {
-                    metadata.size() == *size && path.hash_file().is_ok_and(|h| h == *hash)
+                    metadata.size() == *size
+                        && Sha256Hash::from_file(path).is_ok_and(|h| h == *hash)
                 }
                 PathInfo::HardLink { size, hash } => {
-                    metadata.size() == *size && path.hash_file().is_ok_and(|h| h == *hash)
+                    metadata.size() == *size
+                        && Sha256Hash::from_file(path).is_ok_and(|h| h == *hash)
                 }
                 PathInfo::Symlink { original } => path.read_link().is_ok_and(|o| o == *original),
             } {

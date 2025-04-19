@@ -8,7 +8,7 @@ anyhow = "1.0.97"
 bincode = "2.0.1"
 clap = { version = "4.5.32", features = ["derive"] }
 crossterm = "0.28.1"
-derive_more = { version = "2.0.1", features = ["from"] }
+derive_more = { version = "2.0.1", features = ["display", "from"] }
 dirs = "6.0.0"
 globset = "0.4.16"
 hex = "0.4.3"
