@@ -12,7 +12,7 @@ use serde::Deserialize;
 
 use crate::{
     cli::Behavior,
-    env::Env,
+    env,
     module::Module,
     source::{hashable::HashableSource, name::SourceName},
     utils::{self, glob::GlobSetExt},
@@ -33,11 +33,11 @@ struct Config {
 }
 
 impl Config {
-    fn load(env: &Env, behavior: Behavior) -> Result<Self> {
-        let mut config = Config::parse(env.config())?;
+    fn load(behavior: Behavior) -> Result<Self> {
+        let mut config = Config::parse(env::config())?;
         config.behavior = behavior;
-        config.load_modules(env.modules())?;
-        config.load_sources(env.config_sources())?;
+        config.load_modules(env::modules())?;
+        config.load_sources(env::config_sources())?;
         Ok(config)
     }
 
@@ -85,10 +85,10 @@ impl Config {
 
 static CONFIG: OnceLock<Config> = OnceLock::new();
 
-pub fn load(env: &Env, behavior: Behavior) -> Result<()> {
+pub fn load(behavior: Behavior) -> Result<()> {
     #[allow(clippy::ok_expect)] // The call to `ok` makes the output prettier.
     CONFIG
-        .set(Config::load(env, behavior)?)
+        .set(Config::load(behavior)?)
         .ok()
         .expect("`config::load` should only be called once");
     Ok(())

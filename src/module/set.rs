@@ -1,13 +1,13 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
+    rc::Rc,
 };
 
 use anyhow::{Result, bail};
 use indexmap::IndexMap;
-use nix::unistd::Uid;
 
-use crate::{config, env::Env, state::State};
+use crate::{config, env::User, state::State};
 
 use super::{Module, link::ModuleLink, source::ModuleSource};
 
@@ -35,31 +35,29 @@ impl ModuleSet {
         Ok(())
     }
 
-    pub fn links(
-        &self,
-        env: &mut Env,
-    ) -> Result<impl ExactSizeIterator<Item = ModuleLink> + use<'_>> {
+    pub fn links(&self) -> Result<impl ExactSizeIterator<Item = ModuleLink> + use<'_>> {
         let mut links = BTreeSet::new();
         for (_, module) in self.modules.iter() {
-            let uid = module.user.as_ref().map(|u| env.uid(u)).transpose()?;
-            Self::links_inner(uid, &module.files, &mut links, ModuleLink::file)?;
-            Self::links_inner(uid, &module.hard_links, &mut links, ModuleLink::hard_link)?;
-            Self::links_inner(uid, &module.symlinks, &mut links, ModuleLink::symlink)?;
+            let user = module.user()?.map(|user| Rc::new(user));
+            let user = user.as_ref();
+            Self::links_inner(user, &module.files, &mut links, ModuleLink::file)?;
+            Self::links_inner(user, &module.hard_links, &mut links, ModuleLink::hard_link)?;
+            Self::links_inner(user, &module.symlinks, &mut links, ModuleLink::symlink)?;
         }
         Ok(links.into_iter())
     }
 
-    fn links_inner<F>(
-        uid: Option<Uid>,
+    fn links_inner<'a, F>(
+        user: Option<&Rc<User>>,
         input: &'static BTreeMap<PathBuf, ModuleSource>,
         output: &mut BTreeSet<ModuleLink<'static>>,
         f: F,
     ) -> Result<()>
     where
-        F: Fn(&'static Path, &'static ModuleSource, Option<Uid>) -> ModuleLink<'static>,
+        F: Fn(&'static Path, &'static ModuleSource, Option<&Rc<User>>) -> ModuleLink<'static>,
     {
         for (path, source) in input.iter() {
-            let link = f(path, source, uid);
+            let link = f(path, source, user);
             if !output.insert(link) {
                 bail!("Path {} is used multiple times", path.display());
             }
@@ -67,10 +65,10 @@ impl ModuleSet {
         Ok(())
     }
 
-    pub fn enable(&self, env: &mut Env, state: &mut State, name: &str) -> Result<()> {
+    pub fn enable(&self, state: &mut State, name: &str) -> Result<()> {
         state.add_module(name);
-        for link in self.links(env)? {
-            link.create(env, state, name)?
+        for link in self.links()? {
+            link.create(state, name)?
         }
         Ok(())
     }

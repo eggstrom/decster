@@ -8,7 +8,7 @@ use anyhow::Result;
 use bincode::{Decode, Encode};
 use serde::Deserialize;
 
-use crate::{env::Env, utils};
+use crate::{env, utils};
 
 pub mod hashable;
 pub mod ident;
@@ -24,7 +24,7 @@ pub enum Source {
 }
 
 impl Source {
-    pub fn fetch(&self, env: &Env, source_path: &Path) -> Result<()> {
+    pub fn fetch(&self, source_path: &Path) -> Result<()> {
         if source_path.exists() || source_path.is_symlink() {
             utils::fs::remove_all(source_path)?;
         }
@@ -32,7 +32,7 @@ impl Source {
         match self {
             Source::Text(text) => self.fetch_text(source_path, text),
             Source::Symlink(path) => self.fetch_symlink(source_path, path),
-            Source::Path(path) => self.fetch_path(source_path, &env.untildefy(path)),
+            Source::Path(path) => self.fetch_path(source_path, &env::untildefy(path)),
         }
     }
 

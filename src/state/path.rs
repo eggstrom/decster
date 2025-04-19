@@ -10,7 +10,7 @@ use bincode::{Decode, Encode};
 use crossterm::style::Stylize;
 
 use crate::{
-    env::Env,
+    env,
     utils::{
         pretty::Pretty,
         sha256::{PathHash, Sha256Hash},
@@ -60,7 +60,7 @@ impl PathInfo {
         }
     }
 
-    pub fn remove_if_owned<P>(&self, env: &Env, path: P) -> Result<()>
+    pub fn remove_if_owned<P>(&self, path: P) -> Result<()>
     where
         P: AsRef<Path>,
     {
@@ -77,14 +77,14 @@ impl PathInfo {
                 eprintln!(
                     "{} Skipped {} (File has changed)",
                     "info:".yellow(),
-                    env.tildefy(path).display()
+                    env::tildefy(path).display()
                 );
             }
             PathState::Missing => {
                 eprintln!(
                     "{} Skipped {} (File is missing)",
                     "info:".yellow(),
-                    env.tildefy(path).pretty()
+                    env::tildefy(path).pretty()
                 );
             }
         }

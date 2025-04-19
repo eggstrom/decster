@@ -1,31 +1,52 @@
 use std::{
     borrow::Cow,
-    collections::HashMap,
     fs,
+    os::unix,
     path::{Path, PathBuf},
+    sync::OnceLock,
 };
 
-use anyhow::{Result, anyhow};
-use nix::unistd::{self, Uid};
+use anyhow::{Context, Result, anyhow};
+use nix::unistd;
 
-struct User {
-    uid: Uid,
+use crate::utils::pretty::Pretty;
+
+#[derive(Eq, Ord, PartialEq, PartialOrd)]
+pub struct User {
+    uid: u32,
     home: PathBuf,
 }
 
-impl From<unistd::User> for User {
-    fn from(value: unistd::User) -> Self {
-        User {
-            uid: value.uid,
-            home: value.dir,
-        }
+impl User {
+    pub fn new(name: &str) -> Result<Self> {
+        unistd::User::from_name(name)?
+            .map(|user| User {
+                uid: user.uid.as_raw(),
+                home: user.dir,
+            })
+            .ok_or(anyhow!("User doesn't exist"))
+    }
+
+    pub fn is_current(&self) -> bool {
+        self.uid == uid()
+    }
+
+    pub fn tildefy<'a>(&self, path: &'a Path) -> Cow<'a, Path> {
+        tildefy_with(path, &self.home)
+    }
+
+    pub fn untildefy<'a>(&self, path: &'a Path) -> Cow<'a, Path> {
+        untildefy_with(path, &self.home)
+    }
+
+    pub fn change_owner(&self, path: &Path) -> Result<()> {
+        unix::fs::lchown(path, Some(self.uid), None)
+            .with_context(|| format!("Couldn't change owner of {}", tildefy(path).pretty()))
     }
 }
 
-pub struct Env {
-    uid: Uid,
-    users: HashMap<String, Option<User>>,
-
+struct Env {
+    uid: u32,
     home: PathBuf,
     config: PathBuf,
     modules: PathBuf,
@@ -37,7 +58,6 @@ pub struct Env {
 
 impl Env {
     const APP_NAME: &str = "decster";
-    const TILDE: &str = "~";
 
     pub fn load(config_dir: Option<PathBuf>) -> Result<Self> {
         let home = dirs::home_dir().ok_or(anyhow!("Couldn't determine path of home directory"))?;
@@ -55,9 +75,7 @@ impl Env {
             .map_err(|err| anyhow!("Couldn't create data directory ({err})"))?;
 
         Ok(Env {
-            uid: unistd::geteuid(),
-            users: HashMap::new(),
-
+            uid: unistd::getuid().as_raw(),
             home,
             config: config.join("config.toml"),
             modules: config.join("modules"),
@@ -67,86 +85,80 @@ impl Env {
             state: data.join("state"),
         })
     }
+}
 
-    pub fn is_current_uid<U>(&mut self, uid: U) -> bool
-    where
-        U: Into<Uid>,
-    {
-        uid.into() == self.uid
-    }
+static ENV: OnceLock<Env> = OnceLock::new();
 
-    fn user(&mut self, name: &str) -> Result<&User> {
-        if !self.users.contains_key(name) {
-            let user = unistd::User::from_name(name)?.map(|user| user.into());
-            self.users.insert(name.to_string(), user);
-        }
-        self.users
-            .get(name)
-            .unwrap()
-            .as_ref()
-            .ok_or(anyhow!("User doesn't exist"))
-    }
+pub fn load(config_dir: Option<PathBuf>) -> Result<()> {
+    ENV.set(Env::load(config_dir)?)
+        .ok()
+        .expect("`env::load` should only be called once");
+    Ok(())
+}
 
-    pub fn uid(&mut self, name: &str) -> Result<Uid> {
-        self.user(name).map(|user| user.uid)
-    }
+fn env() -> &'static Env {
+    ENV.get().expect(
+        "`env::load` should be called without failing before other functions in `env` are called",
+    )
+}
 
-    fn home_of(&mut self, name: &str) -> Result<&Path> {
-        self.user(name).map(|user| user.home.as_path())
-    }
+fn uid() -> u32 {
+    env().uid
+}
 
-    pub fn home(&self) -> &Path {
-        &self.home
-    }
+pub fn home() -> &'static Path {
+    &env().home
+}
 
-    pub fn config(&self) -> &Path {
-        &self.config
-    }
+pub fn config() -> &'static Path {
+    &env().config
+}
 
-    pub fn modules(&self) -> &Path {
-        &self.modules
-    }
+pub fn modules() -> &'static Path {
+    &env().modules
+}
 
-    pub fn config_sources(&self) -> &Path {
-        &self.config_sources
-    }
+pub fn config_sources() -> &'static Path {
+    &env().config_sources
+}
 
-    pub fn named_sources(&self) -> &Path {
-        &self.named_sources
-    }
+pub fn named_sources() -> &'static Path {
+    &env().named_sources
+}
 
-    pub fn unnamed_sources(&self) -> &Path {
-        &self.unnamed_sources
-    }
+pub fn unnamed_sources() -> &'static Path {
+    &env().unnamed_sources
+}
 
-    pub fn state(&self) -> &Path {
-        &self.state
-    }
+pub fn state() -> &'static Path {
+    &env().state
+}
 
-    fn tildefy_inner<'a>(path: &'a Path, home: &Path) -> Cow<'a, Path> {
-        match path.strip_prefix(home) {
-            Ok(path) => match path.parent() {
-                None => Cow::Borrowed(Path::new(Self::TILDE)),
-                Some(_) => Cow::Owned(Path::new(Self::TILDE).join(path)),
-            },
-            Err(_) => Cow::Borrowed(path),
-        }
-    }
+const TILDE: &str = "~";
 
-    fn untildefy_inner<'a>(path: &'a Path, home: &Path) -> Cow<'a, Path> {
-        match path.strip_prefix(Self::TILDE) {
-            Ok(path) => Cow::Owned(home.join(path)),
-            Err(_) => Cow::Borrowed(path),
-        }
+fn tildefy_with<'a>(path: &'a Path, home: &Path) -> Cow<'a, Path> {
+    match path.strip_prefix(home) {
+        Ok(path) => match path.parent() {
+            None => Cow::Borrowed(Path::new(TILDE)),
+            Some(_) => Cow::Owned(Path::new(TILDE).join(path)),
+        },
+        Err(_) => Cow::Borrowed(path),
     }
+}
 
-    pub fn tildefy<'a>(&self, path: &'a Path) -> Cow<'a, Path> {
-        Self::tildefy_inner(path, self.home())
+fn untildefy_with<'a>(path: &'a Path, home: &Path) -> Cow<'a, Path> {
+    match path.strip_prefix(TILDE) {
+        Ok(path) => Cow::Owned(home.join(path)),
+        Err(_) => Cow::Borrowed(path),
     }
+}
 
-    pub fn untildefy<'a>(&self, path: &'a Path) -> Cow<'a, Path> {
-        Self::untildefy_inner(path, self.home())
-    }
+pub fn tildefy(path: &Path) -> Cow<Path> {
+    tildefy_with(path, home())
+}
+
+pub fn untildefy(path: &Path) -> Cow<Path> {
+    untildefy_with(path, home())
 }
 
 #[cfg(test)]
@@ -171,7 +183,7 @@ mod tests {
     fn tildefy() {
         let home = dirs::home_dir().unwrap();
         for (tilde, untilde) in paths(&home) {
-            assert_eq!(Env::tildefy_inner(&untilde, &home), tilde);
+            assert_eq!(tildefy_with(&untilde, &home), tilde);
         }
     }
 
@@ -179,7 +191,7 @@ mod tests {
     fn untildefy() {
         let home = dirs::home_dir().unwrap();
         for (tilde, no_tilde) in paths(&home) {
-            assert_eq!(Env::untildefy_inner(tilde, &home), no_tilde);
+            assert_eq!(untildefy_with(tilde, &home), no_tilde);
         }
     }
 }

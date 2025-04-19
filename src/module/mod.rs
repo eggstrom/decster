@@ -8,6 +8,8 @@ use anyhow::Result;
 use serde::Deserialize;
 use source::ModuleSource;
 
+use crate::env::User;
+
 pub mod link;
 pub mod set;
 pub mod source;
@@ -35,5 +37,14 @@ impl Module {
     {
         let path = path.as_ref();
         Ok(toml::from_str(&fs::read_to_string(path)?)?)
+    }
+
+    pub fn user(&self) -> Result<Option<User>> {
+        Ok(self
+            .user
+            .as_ref()
+            .map(|u| User::new(u))
+            .transpose()?
+            .filter(|user| !user.is_current()))
     }
 }

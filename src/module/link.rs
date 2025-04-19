@@ -4,14 +4,14 @@ use std::{
     fs, io,
     os::unix::{self, fs::MetadataExt},
     path::Path,
+    rc::Rc,
 };
 
 use anyhow::{Context, Result, anyhow, bail};
 use crossterm::style::Stylize;
-use nix::unistd::Uid;
 
 use crate::{
-    env::Env,
+    env::{self, User},
     state::{State, path::PathInfo},
     utils::{self, pretty::Pretty, sha256::PathHash},
 };
@@ -41,42 +41,42 @@ pub struct ModuleLink<'a> {
     kind: LinkKind,
     path: &'a Path,
     source: &'a ModuleSource,
-    uid: Option<u32>,
+    user: Option<Rc<User>>,
 }
 
 impl<'a> ModuleLink<'a> {
-    pub fn file(path: &'a Path, source: &'a ModuleSource, uid: Option<Uid>) -> Self {
+    pub fn file(path: &'a Path, source: &'a ModuleSource, user: Option<&Rc<User>>) -> Self {
         ModuleLink {
             kind: LinkKind::File,
             path,
             source,
-            uid: uid.map(|uid| uid.as_raw()),
+            user: user.map(Rc::clone),
         }
     }
 
-    pub fn hard_link(path: &'a Path, source: &'a ModuleSource, uid: Option<Uid>) -> Self {
+    pub fn hard_link(path: &'a Path, source: &'a ModuleSource, user: Option<&Rc<User>>) -> Self {
         ModuleLink {
             kind: LinkKind::HardLink,
             path,
             source,
-            uid: uid.map(|uid| uid.as_raw()),
+            user: user.map(Rc::clone),
         }
     }
 
-    pub fn symlink(path: &'a Path, source: &'a ModuleSource, uid: Option<Uid>) -> Self {
+    pub fn symlink(path: &'a Path, source: &'a ModuleSource, user: Option<&Rc<User>>) -> Self {
         ModuleLink {
             kind: LinkKind::Symlink,
             path,
             source,
-            uid: uid.map(|uid| uid.as_raw()),
+            user: user.map(Rc::clone),
         }
     }
 
-    pub fn create(&self, env: &mut Env, state: &mut State, module: &str) -> Result<()> {
-        let source_path = self.source.fetch(env, state, module, self.path)?;
+    pub fn create(&self, state: &mut State, module: &str) -> Result<()> {
+        let source_path = self.source.fetch(state, module, self.path)?;
 
         utils::fs::walk_dir_rel(source_path, false, false, |path, rel_path| {
-            let mut new_path = env.untildefy(self.path);
+            let mut new_path = env::untildefy(self.path);
             if rel_path.parent().is_some() {
                 new_path = Cow::Owned(new_path.join(rel_path));
             }
@@ -87,7 +87,7 @@ impl<'a> ModuleLink<'a> {
                 if !new_path.is_dir() {
                     fs::create_dir(&new_path)?;
                     state.add_path(module, &new_path, PathInfo::Directory);
-                    self.change_owner(env, &new_path)?;
+                    self.change_owner(&new_path)?;
                 }
             } else {
                 let info = match self.kind {
@@ -96,11 +96,11 @@ impl<'a> ModuleLink<'a> {
                     LinkKind::Symlink => Self::create_symlink(path, &new_path),
                 }
                 .with_context(|| {
-                    let new_path = env.tildefy(new_path.as_ref());
+                    let new_path = env::tildefy(new_path.as_ref());
                     anyhow!("Couldn't create {} ({})", new_path.pretty(), self.kind)
                 })?;
                 state.add_path(module, &new_path, info);
-                self.change_owner(env, &new_path)?;
+                self.change_owner(&new_path)?;
             }
             Ok(())
         })?;
@@ -127,11 +127,9 @@ impl<'a> ModuleLink<'a> {
         Ok(PathInfo::Symlink { original })
     }
 
-    fn change_owner(&self, env: &mut Env, path: &Path) -> Result<()> {
-        if !self.uid.is_some_and(|uid| env.is_current_uid(uid)) {
-            unix::fs::lchown(path, self.uid, None).with_context(|| {
-                format!("Couldn't change owner of {}", env.tildefy(path).pretty())
-            })?;
+    fn change_owner(&self, path: &Path) -> Result<()> {
+        if let Some(user) = &self.user {
+            user.change_owner(path)?;
         }
         Ok(())
     }

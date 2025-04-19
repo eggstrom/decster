@@ -12,8 +12,6 @@ use serde::{
 };
 use thiserror::Error;
 
-use crate::env::Env;
-
 use super::name::{ParseSourceNameError, SourceName};
 
 #[derive(Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
@@ -23,16 +21,16 @@ pub struct SourcePath {
 }
 
 impl SourcePath {
-    pub fn named_path(&self, env: &Env) -> PathBuf {
-        let mut full_path = self.name.named_path(env);
+    pub fn named_path(&self) -> PathBuf {
+        let mut full_path = self.name.named_path();
         if let Some(path) = &self.path {
             full_path.push(path);
         }
         full_path
     }
 
-    pub fn config_path(&self, env: &Env) -> PathBuf {
-        let mut full_path = self.name.config_path(env);
+    pub fn config_path(&self) -> PathBuf {
+        let mut full_path = self.name.config_path();
         if let Some(path) = &self.path {
             full_path.push(path);
         }

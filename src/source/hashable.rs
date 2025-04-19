@@ -4,10 +4,7 @@ use anyhow::{Context, Result, bail};
 use bincode::{Decode, Encode};
 use serde::Deserialize;
 
-use crate::{
-    env::Env,
-    utils::sha256::{PathHash, Sha256Hash},
-};
+use crate::utils::sha256::{PathHash, Sha256Hash};
 
 use super::Source;
 
@@ -19,8 +16,8 @@ pub struct HashableSource {
 }
 
 impl HashableSource {
-    pub fn fetch(&self, env: &Env, path: &Path) -> Result<()> {
-        self.source.fetch(env, path)?;
+    pub fn fetch(&self, path: &Path) -> Result<()> {
+        self.source.fetch(path)?;
         if let Some(hash) = &self.hash {
             if path.hash_all().context("Couldn't calculate hash")? == *hash {
                 bail!("Contents don't match hash");
