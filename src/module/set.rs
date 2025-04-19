@@ -38,7 +38,7 @@ impl ModuleSet {
     pub fn links(&self) -> Result<impl ExactSizeIterator<Item = ModuleLink> + use<'_>> {
         let mut links = BTreeSet::new();
         for (_, module) in self.modules.iter() {
-            let user = module.user()?.map(|user| Rc::new(user));
+            let user = module.user()?.map(Rc::new);
             let user = user.as_ref();
             Self::links_inner(user, &module.files, &mut links, ModuleLink::file)?;
             Self::links_inner(user, &module.hard_links, &mut links, ModuleLink::hard_link)?;
@@ -47,7 +47,7 @@ impl ModuleSet {
         Ok(links.into_iter())
     }
 
-    fn links_inner<'a, F>(
+    fn links_inner<F>(
         user: Option<&Rc<User>>,
         input: &'static BTreeMap<PathBuf, ModuleSource>,
         output: &mut BTreeSet<ModuleLink<'static>>,

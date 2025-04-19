@@ -76,7 +76,10 @@ impl<'a> ModuleLink<'a> {
         let source_path = self.source.fetch(state, module, self.path)?;
 
         utils::fs::walk_dir_rel(source_path, false, false, |path, rel_path| {
-            let mut new_path = env::untildefy(self.path);
+            let mut new_path = match &self.user {
+                Some(user) => user.untildefy(self.path),
+                None => env::untildefy(self.path),
+            };
             if rel_path.parent().is_some() {
                 new_path = Cow::Owned(new_path.join(rel_path));
             }
