@@ -1,27 +1,27 @@
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashMap},
     path::{Path, PathBuf},
     rc::Rc,
 };
 
 use anyhow::{Result, bail};
+use crossterm::style::Stylize;
 use indexmap::IndexMap;
+use toml::Value;
 
 use crate::{config, env::User, state::State};
 
 use super::{Module, link::ModuleLink, source::ModuleSource};
 
 pub struct ModuleSet {
-    modules: Vec<(&'static str, &'static Module)>,
+    modules: IndexMap<&'static str, &'static Module>,
 }
 
 impl ModuleSet {
     pub fn new(name: &str) -> Result<Self> {
         let mut modules = IndexMap::new();
         Self::new_inner(name, &mut modules)?;
-        Ok(ModuleSet {
-            modules: modules.into_iter().collect(),
-        })
+        Ok(ModuleSet { modules })
     }
 
     fn new_inner(name: &str, modules: &mut IndexMap<&str, &Module>) -> Result<()> {
@@ -43,19 +43,17 @@ impl ModuleSet {
             Self::links_inner(user, &module.files, &mut links, ModuleLink::file)?;
             Self::links_inner(user, &module.hard_links, &mut links, ModuleLink::hard_link)?;
             Self::links_inner(user, &module.symlinks, &mut links, ModuleLink::symlink)?;
+            Self::links_inner(user, &module.templates, &mut links, ModuleLink::template)?;
         }
         Ok(links.into_iter())
     }
 
-    fn links_inner<F>(
+    fn links_inner(
         user: Option<&Rc<User>>,
         input: &'static BTreeMap<PathBuf, ModuleSource>,
         output: &mut BTreeSet<ModuleLink<'static>>,
-        f: F,
-    ) -> Result<()>
-    where
-        F: Fn(&'static Path, &'static ModuleSource, Option<&Rc<User>>) -> ModuleLink<'static>,
-    {
+        f: fn(&'static Path, &'static ModuleSource, Option<&Rc<User>>) -> ModuleLink<'static>,
+    ) -> Result<()> {
         for (path, source) in input.iter() {
             let link = f(path, source, user);
             if !output.insert(link) {
@@ -65,10 +63,24 @@ impl ModuleSet {
         Ok(())
     }
 
+    fn context(&self) -> Result<HashMap<&str, &Value>> {
+        let mut context = HashMap::new();
+        for module in self.modules.values() {
+            for (name, value) in module.context.iter() {
+                let name = name.as_str();
+                if context.insert(name, value).is_some() {
+                    let name = name.magenta();
+                    bail!("Variable {name} is defined in multiple contexts",);
+                }
+            }
+        }
+        Ok(context)
+    }
+
     pub fn enable(&self, state: &mut State, name: &str) -> Result<()> {
         state.add_module(name);
         for link in self.links()? {
-            link.create(state, name)?
+            link.create(state, name, &self.context()?)?
         }
         Ok(())
     }

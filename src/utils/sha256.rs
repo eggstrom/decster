@@ -12,10 +12,19 @@ use hex::{FromHex, FromHexError};
 use serde::{Deserialize, Deserializer, de};
 use sha2::{Digest, Sha256};
 
-#[derive(Clone, Decode, Encode, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Decode, Encode, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Sha256Hash([u8; 32]);
 
 impl Sha256Hash {
+    pub fn from_bytes<B>(bytes: B) -> Sha256Hash
+    where
+        B: AsRef<[u8]>,
+    {
+        let mut hasher = Sha256::new();
+        hasher.update(bytes);
+        hasher.finalize().into()
+    }
+
     /// Creates a SHA-256 hash from a file's contents.
     pub fn from_file(path: &Path) -> io::Result<Sha256Hash> {
         let mut hasher = Sha256::new();

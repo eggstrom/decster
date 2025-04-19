@@ -8,7 +8,7 @@ use crate::utils::sha256::Sha256Hash;
 
 use super::Source;
 
-#[derive(Clone, Decode, Deserialize, Encode, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Decode, Deserialize, Encode, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct HashableSource {
     #[serde(flatten)]
     source: Source,

@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::Result;
 use bincode::{Decode, Encode};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{env, utils};
 
@@ -15,7 +15,9 @@ pub mod ident;
 pub mod name;
 pub mod path;
 
-#[derive(Clone, Debug, Decode, Deserialize, Encode, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[derive(
+    Clone, Debug, Decode, Deserialize, Encode, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize,
+)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Source {
     Text(String),

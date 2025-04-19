@@ -14,7 +14,7 @@ use thiserror::Error;
 
 use super::name::{ParseSourceNameError, SourceName};
 
-#[derive(Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SourcePath {
     pub name: SourceName,
     pub path: Option<PathBuf>,

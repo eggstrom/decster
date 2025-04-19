@@ -11,7 +11,7 @@ use crate::{
     utils::sha256::Sha256Hash,
 };
 
-#[derive(Deserialize, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[derive(Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[serde(untagged)]
 pub enum ModuleSource {
     Named(SourcePath),

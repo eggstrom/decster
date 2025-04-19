@@ -20,7 +20,7 @@ use crate::{
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-struct Config {
+pub struct Config {
     #[serde(skip)]
     behavior: Behavior,
 

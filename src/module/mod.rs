@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
 };
@@ -7,6 +7,7 @@ use std::{
 use anyhow::Result;
 use serde::Deserialize;
 use source::ModuleSource;
+use toml::Value;
 
 use crate::env::User;
 
@@ -28,6 +29,11 @@ pub struct Module {
     hard_links: BTreeMap<PathBuf, ModuleSource>,
     #[serde(default)]
     symlinks: BTreeMap<PathBuf, ModuleSource>,
+    #[serde(default)]
+    templates: BTreeMap<PathBuf, ModuleSource>,
+
+    #[serde(default)]
+    pub context: HashMap<String, Value>,
 }
 
 impl Module {
@@ -43,7 +49,7 @@ impl Module {
         Ok(self
             .user
             .as_ref()
-            .map(|u| User::new(u))
+            .map(|user| User::new(user))
             .transpose()?
             .filter(|user| !user.is_current()))
     }

@@ -101,9 +101,9 @@ pub enum PathKind {
 impl Display for PathKind {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            PathKind::Directory => "Directory".grey(),
-            PathKind::File => "File".green(),
-            PathKind::HardLink => "HardLink".cyan(),
+            PathKind::Directory => "Directory".blue(),
+            PathKind::File => "File".blue(),
+            PathKind::HardLink => "HardLink".blue(),
             PathKind::Symlink => "Symlink".blue(),
         }
         .fmt(f)

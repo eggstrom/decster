@@ -1,6 +1,8 @@
 use std::{
     borrow::Cow,
-    fs, io,
+    collections::HashMap,
+    fs::{self, File},
+    io::Write,
     os::unix::{self, fs::MetadataExt},
     path::Path,
     rc::Rc,
@@ -9,6 +11,8 @@ use std::{
 use anyhow::{Context, Result, anyhow, bail};
 use crossterm::style::Stylize;
 use derive_more::Display;
+use toml::Value;
+use upon::Engine;
 
 use crate::{
     env::{self, User},
@@ -20,12 +24,14 @@ use super::source::ModuleSource;
 
 #[derive(Display, Eq, Ord, PartialEq, PartialOrd)]
 enum LinkKind {
-    #[display("{}", "File".green())]
+    #[display("{}", "File".blue())]
     File,
-    #[display("{}", "Hard Link".cyan())]
+    #[display("{}", "Hard Link".blue())]
     HardLink,
     #[display("{}", "Symlink".blue())]
     Symlink,
+    #[display("{}", "Template".blue())]
+    Template,
 }
 
 #[derive(Eq, Ord, PartialOrd)]
@@ -64,7 +70,21 @@ impl<'a> ModuleLink<'a> {
         }
     }
 
-    pub fn create(&self, state: &mut State, module: &str) -> Result<()> {
+    pub fn template(path: &'a Path, source: &'a ModuleSource, user: Option<&Rc<User>>) -> Self {
+        ModuleLink {
+            kind: LinkKind::Template,
+            path,
+            source,
+            user: user.map(Rc::clone),
+        }
+    }
+
+    pub fn create(
+        &self,
+        state: &mut State,
+        module: &str,
+        context: &HashMap<&str, &Value>,
+    ) -> Result<()> {
         let source_path = self.source.fetch(state, module, self.path)?;
 
         utils::fs::walk_dir_rel(source_path, false, false, |path, rel_path| {
@@ -89,6 +109,7 @@ impl<'a> ModuleLink<'a> {
                     LinkKind::File => Self::create_file(path, &new_path),
                     LinkKind::HardLink => Self::create_hard_link(path, &new_path),
                     LinkKind::Symlink => Self::create_symlink(path, &new_path),
+                    LinkKind::Template => Self::create_template(path, &new_path, context),
                 }
                 .with_context(|| {
                     let new_path = env::tildefy(new_path.as_ref());
@@ -102,24 +123,40 @@ impl<'a> ModuleLink<'a> {
         Ok(())
     }
 
-    fn create_file(from: &Path, to: &Path) -> io::Result<PathInfo> {
+    fn create_file(from: &Path, to: &Path) -> Result<PathInfo> {
         let size = from.symlink_metadata()?.size();
         let hash = Sha256Hash::from_file(from)?;
         utils::fs::copy(from, to)?;
         Ok(PathInfo::File { size, hash })
     }
 
-    fn create_hard_link(original: &Path, link: &Path) -> io::Result<PathInfo> {
+    fn create_hard_link(original: &Path, link: &Path) -> Result<PathInfo> {
         let size = original.symlink_metadata()?.size();
         let hash = Sha256Hash::from_file(original)?;
         fs::hard_link(original, link)?;
         Ok(PathInfo::HardLink { size, hash })
     }
 
-    fn create_symlink(original: &Path, link: &Path) -> io::Result<PathInfo> {
+    fn create_symlink(original: &Path, link: &Path) -> Result<PathInfo> {
         unix::fs::symlink(original, link)?;
         let original = original.to_path_buf();
         Ok(PathInfo::Symlink { original })
+    }
+
+    fn create_template(
+        from: &Path,
+        to: &Path,
+        context: &HashMap<&str, &Value>,
+    ) -> Result<PathInfo> {
+        let engine = Engine::new();
+        let text = engine
+            .compile(&fs::read_to_string(from)?)?
+            .render(&engine, context)
+            .to_string()?;
+        File::create_new(to)?.write_all(text.as_bytes())?;
+        let size = text.len() as u64;
+        let hash = Sha256Hash::from_bytes(text);
+        Ok(PathInfo::File { size, hash })
     }
 
     fn change_owner(&self, path: &Path) -> Result<()> {
