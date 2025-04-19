@@ -14,6 +14,7 @@ use crate::utils::pretty::Pretty;
 #[derive(Eq, Ord, PartialEq, PartialOrd)]
 pub struct User {
     uid: u32,
+    gid: u32,
     home: PathBuf,
 }
 
@@ -22,6 +23,7 @@ impl User {
         unistd::User::from_name(name)?
             .map(|user| User {
                 uid: user.uid.as_raw(),
+                gid: user.gid.as_raw(),
                 home: user.dir,
             })
             .ok_or(anyhow!("User doesn't exist"))
@@ -40,7 +42,7 @@ impl User {
     }
 
     pub fn change_owner(&self, path: &Path) -> Result<()> {
-        unix::fs::lchown(path, Some(self.uid), None)
+        unix::fs::lchown(path, Some(self.uid), Some(self.gid))
             .with_context(|| format!("Couldn't change owner of {}", tildefy(path).pretty()))
     }
 }
