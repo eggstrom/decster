@@ -43,7 +43,7 @@ impl ModuleSource {
         };
 
         if let Some((ident, source)) = info {
-            if !state.is_source_fetched(&ident, source) {
+            if config::fetch() || !state.is_source_fetched(&ident, source) {
                 source.fetch(&path)?;
                 state.add_source(&ident, source);
             }
