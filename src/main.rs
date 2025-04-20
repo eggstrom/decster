@@ -5,6 +5,7 @@ use std::process;
 mod app;
 mod cli;
 mod global;
+mod http;
 mod module;
 mod source;
 mod state;
