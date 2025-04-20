@@ -48,7 +48,9 @@ impl State {
     }
 
     pub fn is_source_fetched(&self, ident: &SourceIdent, source: &HashableSource) -> bool {
-        self.sources.get(ident).is_some_and(|s| s == source) && ident.path().exists()
+        self.sources
+            .get(ident)
+            .is_some_and(|s| s == source && source.check(&ident.path()).is_ok())
     }
 
     pub fn is_module_enabled(&self, module: &str) -> bool {

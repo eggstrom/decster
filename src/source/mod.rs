@@ -35,26 +35,26 @@ impl Source {
         }
 
         match self {
-            Source::Text(text) => self.fetch_text(source_path, text),
-            Source::Symlink(path) => self.fetch_symlink(source_path, path),
-            Source::Path(path) => self.fetch_path(source_path, &env::untildefy(path)),
-            Source::Url(url) => self.fetch_url(source_path, url),
+            Source::Text(text) => Self::fetch_text(source_path, text),
+            Source::Symlink(path) => Self::fetch_symlink(source_path, path),
+            Source::Path(path) => Self::fetch_path(source_path, &env::untildefy(path)),
+            Source::Url(url) => Self::fetch_url(source_path, url),
         }
     }
 
-    fn fetch_text(&self, source_path: &Path, text: &str) -> Result<()> {
+    fn fetch_text(source_path: &Path, text: &str) -> Result<()> {
         Ok(fs::write(source_path, text)?)
     }
 
-    fn fetch_symlink(&self, source_path: &Path, path: &Path) -> Result<()> {
+    fn fetch_symlink(source_path: &Path, path: &Path) -> Result<()> {
         Ok(unix::fs::symlink(path, source_path)?)
     }
 
-    fn fetch_path(&self, source_path: &Path, path: &Path) -> Result<()> {
+    fn fetch_path(source_path: &Path, path: &Path) -> Result<()> {
         utils::fs::copy_all(path, source_path)
     }
 
-    fn fetch_url<U>(&self, source_path: &Path, url: U) -> Result<()>
+    fn fetch_url<U>(source_path: &Path, url: U) -> Result<()>
     where
         U: IntoUrl,
     {

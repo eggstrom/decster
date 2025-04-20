@@ -19,8 +19,13 @@ pub struct HashableSource {
 impl HashableSource {
     pub fn fetch(&self, path: &Path) -> Result<()> {
         self.source.fetch(path)?;
+        self.check(path)?;
+        Ok(())
+    }
+
+    pub fn check(&self, path: &Path) -> Result<()> {
         if let Some(hash) = &self.hash {
-            if Sha256Hash::from_path(path).context("Couldn't calculate hash")? == *hash {
+            if Sha256Hash::from_path(path).context("Couldn't calculate hash")? != *hash {
                 bail!("Contents don't match hash");
             }
         }
