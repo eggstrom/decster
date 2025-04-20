@@ -8,7 +8,7 @@ use anyhow::Result;
 use bincode::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 
-use crate::{env, utils};
+use crate::{global::env, utils};
 
 pub mod hashable;
 pub mod ident;

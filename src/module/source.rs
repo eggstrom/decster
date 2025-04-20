@@ -5,7 +5,7 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
 use crate::{
-    config, env,
+    global::{config, env},
     source::{hashable::HashableSource, ident::SourceIdent, path::SourcePath},
     state::State,
     utils::sha256::Sha256Hash,

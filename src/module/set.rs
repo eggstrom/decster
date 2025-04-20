@@ -9,7 +9,10 @@ use crossterm::style::Stylize;
 use indexmap::IndexMap;
 use toml::Value;
 
-use crate::{config, env::User, state::State};
+use crate::{
+    global::{config, env::User},
+    state::State,
+};
 
 use super::{Module, link::ModuleLink, source::ModuleSource};
 

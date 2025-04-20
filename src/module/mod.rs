@@ -9,7 +9,7 @@ use serde::Deserialize;
 use source::ModuleSource;
 use toml::Value;
 
-use crate::env::User;
+use crate::global::env::User;
 
 pub mod link;
 pub mod set;

@@ -11,7 +11,7 @@ use globset::GlobSet;
 use path::PathInfo;
 
 use crate::{
-    env,
+    global::env,
     module::set::ModuleSet,
     source::{hashable::HashableSource, ident::SourceIdent},
     utils::{glob::GlobSetExt, pretty::Pretty},

@@ -6,7 +6,7 @@ use crossterm::style::Stylize;
 
 use crate::{
     cli::{Cli, Command},
-    config, env,
+    global::{self, config, env},
     module::set::ModuleSet,
     source::name::SourceName,
     state::State,
@@ -20,8 +20,7 @@ pub struct App {
 impl App {
     pub fn run() -> Result<()> {
         let cli = Cli::parse();
-        env::load(cli.config)?;
-        config::load(cli.behavior)?;
+        global::load(cli.config, cli.behavior)?;
         let state = State::load()?;
         let mut app = App { state };
 

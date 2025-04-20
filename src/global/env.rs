@@ -3,7 +3,6 @@ use std::{
     fs,
     os::unix,
     path::{Path, PathBuf},
-    sync::OnceLock,
 };
 
 use anyhow::{Context, Result, anyhow};
@@ -47,15 +46,15 @@ impl User {
     }
 }
 
-struct Env {
-    uid: u32,
-    home: PathBuf,
-    config: PathBuf,
-    modules: PathBuf,
-    config_sources: PathBuf,
-    named_sources: PathBuf,
-    unnamed_sources: PathBuf,
-    state: PathBuf,
+pub(super) struct Env {
+    pub uid: u32,
+    pub home: PathBuf,
+    pub config: PathBuf,
+    pub modules: PathBuf,
+    pub config_sources: PathBuf,
+    pub named_sources: PathBuf,
+    pub unnamed_sources: PathBuf,
+    pub state: PathBuf,
 }
 
 impl Env {
@@ -89,19 +88,8 @@ impl Env {
     }
 }
 
-static ENV: OnceLock<Env> = OnceLock::new();
-
-pub fn load(config_dir: Option<PathBuf>) -> Result<()> {
-    ENV.set(Env::load(config_dir)?)
-        .ok()
-        .expect("`env::load` should only be called once");
-    Ok(())
-}
-
 fn env() -> &'static Env {
-    ENV.get().expect(
-        "`env::load` should be called without failing before other functions in `env` are called",
-    )
+    &super::state().env
 }
 
 fn uid() -> u32 {
@@ -110,14 +98,6 @@ fn uid() -> u32 {
 
 pub fn home() -> &'static Path {
     &env().home
-}
-
-pub fn config() -> &'static Path {
-    &env().config
-}
-
-pub fn modules() -> &'static Path {
-    &env().modules
 }
 
 pub fn config_sources() -> &'static Path {

@@ -4,8 +4,7 @@ use std::process;
 
 mod app;
 mod cli;
-mod config;
-mod env;
+mod global;
 mod module;
 mod source;
 mod state;

@@ -11,7 +11,7 @@ use crossterm::style::Stylize;
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::env;
+use crate::global::env;
 
 #[derive(Clone, Debug, Decode, Deserialize, Encode, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SourceName(String);

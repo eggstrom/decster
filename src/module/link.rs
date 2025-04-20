@@ -15,7 +15,7 @@ use toml::Value;
 use upon::Engine;
 
 use crate::{
-    env::{self, User},
+    global::env::{self, User},
     state::{State, path::PathInfo},
     utils::{self, pretty::Pretty, sha256::Sha256Hash},
 };

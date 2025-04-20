@@ -2,7 +2,6 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fs,
     path::Path,
-    sync::OnceLock,
 };
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -12,15 +11,16 @@ use serde::Deserialize;
 
 use crate::{
     cli::Behavior,
-    env,
     module::Module,
     source::{hashable::HashableSource, name::SourceName},
     utils::{self, glob::GlobSetExt},
 };
 
+use super::env::Env;
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Config {
+pub(super) struct Config {
     #[serde(skip)]
     behavior: Behavior,
 
@@ -33,11 +33,11 @@ pub struct Config {
 }
 
 impl Config {
-    fn load(behavior: Behavior) -> Result<Self> {
-        let mut config = Config::parse(env::config())?;
+    pub fn load(env: &Env, behavior: Behavior) -> Result<Self> {
+        let mut config = Config::parse(&env.config)?;
         config.behavior = behavior;
-        config.load_modules(env::modules())?;
-        config.load_sources(env::config_sources())?;
+        config.load_modules(&env.modules)?;
+        config.load_sources(&env.config_sources)?;
         Ok(config)
     }
 
@@ -83,21 +83,8 @@ impl Config {
     }
 }
 
-static CONFIG: OnceLock<Config> = OnceLock::new();
-
-pub fn load(behavior: Behavior) -> Result<()> {
-    #[allow(clippy::ok_expect)] // The call to `ok` makes the output prettier.
-    CONFIG
-        .set(Config::load(behavior)?)
-        .ok()
-        .expect("`config::load` should only be called once");
-    Ok(())
-}
-
 fn config() -> &'static Config {
-    CONFIG
-        .get()
-        .expect("`config::load` should be called without failing before other functions in `config` are called")
+    &super::state().config
 }
 
 pub fn fetch() -> bool {

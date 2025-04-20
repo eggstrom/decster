@@ -10,7 +10,7 @@ use bincode::{Decode, Encode};
 use crossterm::style::Stylize;
 
 use crate::{
-    env,
+    global::env,
     utils::{pretty::Pretty, sha256::Sha256Hash},
 };
 

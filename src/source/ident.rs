@@ -6,7 +6,7 @@ use std::{
 use bincode::{Decode, Encode};
 use sha2::{Digest, Sha256};
 
-use crate::{env, utils::sha256::Sha256Hash};
+use crate::{global::env, utils::sha256::Sha256Hash};
 
 use super::name::SourceName;
 
