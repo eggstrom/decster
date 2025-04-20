@@ -9,6 +9,7 @@ use crate::utils::sha256::Sha256Hash;
 use super::Source;
 
 #[derive(Clone, Decode, Deserialize, Encode, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(deny_unknown_fields)]
 pub struct HashableSource {
     #[serde(flatten)]
     source: Source,
