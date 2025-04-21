@@ -4,8 +4,7 @@ use std::{
     path::Path,
 };
 
-use anyhow::{Context, Result, anyhow, bail};
-use crossterm::style::Stylize;
+use anyhow::{Context, Result, anyhow};
 use globset::GlobSet;
 use serde::Deserialize;
 
@@ -57,16 +56,14 @@ impl Config {
             return Ok(());
         }
         utils::fs::walk_dir_rel(dir, false, false, |path, rel_path| {
-            if path.is_dir() {
-                return Ok(());
-            }
-            if let Some(name) = rel_path.to_string_lossy().strip_suffix(".toml") {
+            if path.is_file() {
+                let name = rel_path.to_string_lossy();
+                let name = match name.strip_suffix(".toml") {
+                    Some(name) => name,
+                    None => name.as_ref(),
+                };
                 let module = Module::parse(path)?;
-                if !self.modules.contains_key(name) {
-                    self.modules.insert(name.to_string(), module);
-                } else {
-                    bail!("Module {} is defined multiple times", name.magenta());
-                }
+                self.modules.insert(name.to_string(), module);
             }
             Ok(())
         })?;
