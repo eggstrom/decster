@@ -25,11 +25,11 @@ pub(super) struct Config {
     behavior: Behavior,
 
     #[serde(skip, default)]
-    sources: HashSet<SourceName>,
-    #[serde(default, rename = "sources")]
-    named_sources: HashMap<SourceName, HashableSource>,
-    #[serde(default)]
     modules: BTreeMap<String, Module>,
+    #[serde(skip, default)]
+    static_sources: HashSet<SourceName>,
+    #[serde(skip, default)]
+    dynamic_sources: HashMap<SourceName, HashableSource>,
 }
 
 impl Config {
@@ -37,7 +37,8 @@ impl Config {
         let mut config = Config::parse(&env.config)?;
         config.behavior = behavior;
         config.load_modules(&env.modules)?;
-        config.load_sources(&env.config_sources)?;
+        config.load_static_sources(&env.static_sources)?;
+        config.load_dynamic_sources(&env.dynamic_sources)?;
         Ok(config)
     }
 
@@ -64,7 +65,7 @@ impl Config {
                 if !self.modules.contains_key(name) {
                     self.modules.insert(name.to_string(), module);
                 } else {
-                    bail!("Module {} is defined twice", name.magenta());
+                    bail!("Module {} is defined multiple times", name.magenta());
                 }
             }
             Ok(())
@@ -72,12 +73,19 @@ impl Config {
         Ok(())
     }
 
-    fn load_sources(&mut self, dir: &Path) -> Result<()> {
-        if !dir.is_dir() {
-            return Ok(());
+    fn load_static_sources(&mut self, dir: &Path) -> Result<()> {
+        if dir.is_dir() {
+            for entry in fs::read_dir(dir)?.filter_map(Result::ok) {
+                self.static_sources
+                    .insert(SourceName::from(entry.file_name()));
+            }
         }
-        for entry in fs::read_dir(dir)?.filter_map(Result::ok) {
-            self.sources.insert(SourceName::from(entry.file_name()));
+        Ok(())
+    }
+
+    fn load_dynamic_sources(&mut self, file: &Path) -> Result<()> {
+        if file.is_file() {
+            self.dynamic_sources = toml::from_str(&fs::read_to_string(file)?)?;
         }
         Ok(())
     }
@@ -104,11 +112,11 @@ pub fn quiet() -> bool {
 }
 
 pub fn has_source(name: &SourceName) -> bool {
-    config().sources.contains(name)
+    config().static_sources.contains(name)
 }
 
-pub fn named_source(name: &SourceName) -> Option<&'static HashableSource> {
-    config().named_sources.get(name)
+pub fn dynamic_source(name: &SourceName) -> Option<&'static HashableSource> {
+    config().dynamic_sources.get(name)
 }
 
 pub fn module(name: &str) -> Result<(&'static str, &'static Module)> {

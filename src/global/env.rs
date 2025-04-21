@@ -51,7 +51,8 @@ pub(super) struct Env {
     pub home: PathBuf,
     pub config: PathBuf,
     pub modules: PathBuf,
-    pub config_sources: PathBuf,
+    pub static_sources: PathBuf,
+    pub dynamic_sources: PathBuf,
     pub named_sources: PathBuf,
     pub unnamed_sources: PathBuf,
     pub state: PathBuf,
@@ -80,7 +81,8 @@ impl Env {
             home,
             config: config.join("config.toml"),
             modules: config.join("modules"),
-            config_sources: config.join("sources"),
+            static_sources: config.join("sources"),
+            dynamic_sources: config.join("sources.toml"),
             named_sources,
             unnamed_sources,
             state: data.join("state"),
@@ -101,7 +103,7 @@ pub fn home() -> &'static Path {
 }
 
 pub fn config_sources() -> &'static Path {
-    &env().config_sources
+    &env().static_sources
 }
 
 pub fn named_sources() -> &'static Path {

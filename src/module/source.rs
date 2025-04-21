@@ -22,7 +22,7 @@ impl ModuleSource {
     pub fn fetch(&self, state: &mut State, module: &str, path: &Path) -> Result<PathBuf> {
         let (path, info) = match self {
             ModuleSource::Named(path) => {
-                if let Some(source) = config::named_source(&path.name) {
+                if let Some(source) = config::dynamic_source(&path.name) {
                     let ident = SourceIdent::named(path.name.clone());
                     (path.named_path(), Some((ident, source)))
                 } else if config::has_source(&path.name) {
