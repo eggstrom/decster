@@ -8,15 +8,15 @@ use std::{
     rc::Rc,
 };
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result, bail};
 use crossterm::style::Stylize;
 use derive_more::Display;
 use toml::Value;
-use upon::Engine;
 
 use crate::{
     global::env::{self, User},
     state::{State, path::PathInfo},
+    upon,
     utils::{self, pretty::Pretty, sha256::Sha256Hash},
 };
 
@@ -43,40 +43,34 @@ pub struct ModuleLink<'a> {
 }
 
 impl<'a> ModuleLink<'a> {
-    pub fn file(path: &'a Path, source: &'a ModuleSource, user: Option<&Rc<User>>) -> Self {
+    fn new(
+        kind: LinkKind,
+        path: &'a Path,
+        source: &'a ModuleSource,
+        user: Option<&Rc<User>>,
+    ) -> Self {
         ModuleLink {
-            kind: LinkKind::File,
+            kind,
             path,
             source,
             user: user.map(Rc::clone),
         }
+    }
+
+    pub fn file(path: &'a Path, source: &'a ModuleSource, user: Option<&Rc<User>>) -> Self {
+        ModuleLink::new(LinkKind::File, path, source, user)
     }
 
     pub fn hard_link(path: &'a Path, source: &'a ModuleSource, user: Option<&Rc<User>>) -> Self {
-        ModuleLink {
-            kind: LinkKind::HardLink,
-            path,
-            source,
-            user: user.map(Rc::clone),
-        }
+        ModuleLink::new(LinkKind::HardLink, path, source, user)
     }
 
     pub fn symlink(path: &'a Path, source: &'a ModuleSource, user: Option<&Rc<User>>) -> Self {
-        ModuleLink {
-            kind: LinkKind::Symlink,
-            path,
-            source,
-            user: user.map(Rc::clone),
-        }
+        ModuleLink::new(LinkKind::Symlink, path, source, user)
     }
 
     pub fn template(path: &'a Path, source: &'a ModuleSource, user: Option<&Rc<User>>) -> Self {
-        ModuleLink {
-            kind: LinkKind::Template,
-            path,
-            source,
-            user: user.map(Rc::clone),
-        }
+        ModuleLink::new(LinkKind::Template, path, source, user)
     }
 
     pub fn create(
@@ -113,7 +107,7 @@ impl<'a> ModuleLink<'a> {
                 }
                 .with_context(|| {
                     let new_path = env::tildefy(new_path.as_ref());
-                    anyhow!("Couldn't create {} ({})", new_path.pretty(), self.kind)
+                    format!("Couldn't create {} ({})", new_path.pretty(), self.kind)
                 })?;
                 state.add_path(module, &new_path, info);
                 self.change_owner(&new_path)?;
@@ -148,14 +142,11 @@ impl<'a> ModuleLink<'a> {
         to: &Path,
         context: &HashMap<&str, &Value>,
     ) -> Result<PathInfo> {
-        let engine = Engine::new();
-        let text = engine
-            .compile(&fs::read_to_string(from)?)?
-            .render(&engine, context)
-            .to_string()?;
-        File::create_new(to)?.write_all(text.as_bytes())?;
-        let size = text.len() as u64;
-        let hash = Sha256Hash::from_bytes(text);
+        let template = fs::read_to_string(from)?;
+        let render = upon::render(&template, context)?;
+        File::create_new(to)?.write_all(render.as_bytes())?;
+        let size = render.len() as u64;
+        let hash = Sha256Hash::from_bytes(render);
         Ok(PathInfo::File { size, hash })
     }
 
