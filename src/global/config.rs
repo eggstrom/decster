@@ -57,13 +57,10 @@ impl Config {
         }
         utils::fs::walk_dir_rel(dir, false, false, |path, rel_path| {
             if path.is_file() {
-                let name = rel_path.to_string_lossy();
-                let name = match name.strip_suffix(".toml") {
-                    Some(name) => name,
-                    None => name.as_ref(),
-                };
-                let module = Module::parse(path)?;
-                self.modules.insert(name.to_string(), module);
+                if let Some(name) = rel_path.to_string_lossy().strip_suffix(".toml") {
+                    let module = Module::parse(path)?;
+                    self.modules.insert(name.to_string(), module);
+                }
             }
             Ok(())
         })?;
