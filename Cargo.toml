@@ -1,5 +1,10 @@
 [package]
 name = "decster"
+description = "A declarative way to manage your system"
+categories = ["command-line-utilities"]
+authors = ["eggstrom"]
+license = "MIT"
+repository = "https://github.com/eggstrom/decster"
 version = "0.1.0"
 edition = "2024"
 
