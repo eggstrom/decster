@@ -1,16 +1,20 @@
 use std::{
-    fs::{self, File},
-    io,
+    fs,
     os::unix,
     path::{Path, PathBuf},
 };
+#[cfg(feature = "http")]
+use std::{fs::File, io};
 
 use anyhow::Result;
 use bincode::{Decode, Encode};
+#[cfg(feature = "http")]
 use reqwest::IntoUrl;
 use serde::{Deserialize, Serialize};
 
-use crate::{global::env, http, utils};
+#[cfg(feature = "http")]
+use crate::http;
+use crate::{global::env, utils};
 
 pub mod hashable;
 pub mod ident;
@@ -25,6 +29,7 @@ pub enum Source {
     Text(String),
     Symlink(PathBuf),
     Path(PathBuf),
+    #[cfg(feature = "http")]
     Url(String),
 }
 
@@ -38,6 +43,7 @@ impl Source {
             Source::Text(text) => Self::fetch_text(source_path, text),
             Source::Symlink(path) => Self::fetch_symlink(source_path, path),
             Source::Path(path) => Self::fetch_path(source_path, &env::untildefy(path)),
+            #[cfg(feature = "http")]
             Source::Url(url) => Self::fetch_url(source_path, url),
         }
     }
@@ -54,6 +60,7 @@ impl Source {
         utils::fs::copy_all(path, source_path)
     }
 
+    #[cfg(feature = "http")]
     fn fetch_url<U>(source_path: &Path, url: U) -> Result<()>
     where
         U: IntoUrl,
