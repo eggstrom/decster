@@ -26,7 +26,7 @@ impl ModuleSource {
                     let ident = SourceIdent::named(path.name.clone());
                     (path.named_path(), Some((ident, source)))
                 } else if config::has_source(&path.name) {
-                    (path.config_path(), None)
+                    (path.static_path(), None)
                 } else {
                     bail!("Source isn't defined");
                 }

@@ -17,8 +17,8 @@ use crate::global::env;
 pub struct SourceName(String);
 
 impl SourceName {
-    pub fn config_path(&self) -> PathBuf {
-        env::config_sources().join(self)
+    pub fn static_path(&self) -> PathBuf {
+        env::static_sources().join(self)
     }
 
     pub fn named_path(&self) -> PathBuf {

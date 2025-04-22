@@ -21,16 +21,16 @@ pub struct SourcePath {
 }
 
 impl SourcePath {
-    pub fn named_path(&self) -> PathBuf {
-        let mut full_path = self.name.named_path();
+    pub fn static_path(&self) -> PathBuf {
+        let mut full_path = self.name.static_path();
         if let Some(path) = &self.path {
             full_path.push(path);
         }
         full_path
     }
 
-    pub fn config_path(&self) -> PathBuf {
-        let mut full_path = self.name.config_path();
+    pub fn named_path(&self) -> PathBuf {
+        let mut full_path = self.name.named_path();
         if let Some(path) = &self.path {
             full_path.push(path);
         }

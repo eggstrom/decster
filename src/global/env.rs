@@ -102,7 +102,7 @@ pub fn home() -> &'static Path {
     &env().home
 }
 
-pub fn config_sources() -> &'static Path {
+pub fn static_sources() -> &'static Path {
     &env().static_sources
 }
 

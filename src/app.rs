@@ -95,7 +95,7 @@ impl App {
     }
 
     fn hash(&self, sources: HashSet<SourceName>) -> Result<()> {
-        self.hash_dir("Config", env::config_sources(), &sources)?;
+        self.hash_dir("Static", env::static_sources(), &sources)?;
         self.hash_dir("Named", env::named_sources(), &sources)?;
         Ok(())
     }
