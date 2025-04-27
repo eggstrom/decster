@@ -25,18 +25,18 @@ impl App {
         let mut app = App { state };
 
         match cli.command {
-            Command::Enable { modules } => app.enable(modules)?,
-            Command::Disable { modules } => app.disable(modules.into_iter().collect())?,
-            Command::Update { modules } => app.update(modules)?,
+            Command::Enable { modules } => app.enable(&modules)?,
+            Command::Disable { modules } => app.disable(&modules)?,
+            Command::Update { modules } => app.update(&modules)?,
             Command::List => app.list(),
             Command::Paths => app.paths()?,
-            Command::Hash { sources } => app.hash(sources)?,
+            Command::Hash { sources } => app.hash(&sources)?,
         }
         Ok(())
     }
 
-    fn enable(&mut self, modules: Vec<String>) -> Result<()> {
-        let globs = Globs::strict(&modules)?;
+    fn enable(&mut self, modules: &[String]) -> Result<()> {
+        let globs = Globs::strict(modules)?;
         let mut has_enabled = false;
         for (name, module) in config::modules_matching_globs(&globs) {
             let modules = module.import(name)?;
@@ -50,17 +50,15 @@ impl App {
             }
         }
         if !has_enabled {
-            let modules = modules.as_slice();
             bail!("{} didn't match any disabled modules", modules.pretty());
         }
         self.state.save()
     }
 
-    fn disable(&mut self, modules: Vec<String>) -> Result<()> {
-        let globs = Globs::strict(&modules)?;
+    fn disable(&mut self, modules: &[String]) -> Result<()> {
+        let globs = Globs::strict(modules)?;
         let matches = self.state.modules_matching_globs(&globs);
         if matches.is_empty() {
-            let modules = modules.as_slice();
             bail!("{} didn't match any enabled modules", modules.pretty());
         }
         for module in matches {
@@ -73,7 +71,7 @@ impl App {
         self.state.save()
     }
 
-    fn update(&mut self, modules: Vec<String>) -> Result<()> {
+    fn update(&mut self, modules: &[String]) -> Result<()> {
         if modules.is_empty() {
             match self.update_inner(self.state.modules()) {
                 Ok(false) => bail!("There are no enabled modules"),
@@ -81,10 +79,9 @@ impl App {
                 _ => (),
             }
         } else {
-            let globs = Globs::permissive(&modules)?;
+            let globs = Globs::permissive(modules)?;
             match self.update_inner(self.state.modules_matching_globs(&globs)) {
                 Ok(false) => {
-                    let modules = modules.as_slice();
                     bail!("{} didn't match any enabled modules", modules.pretty());
                 }
                 Err(err) => eprintln!("{} {err}", "error:".red()),
@@ -135,28 +132,27 @@ impl App {
         Ok(())
     }
 
-    fn hash(&self, sources: Vec<String>) -> Result<()> {
+    fn hash(&self, sources: &[String]) -> Result<()> {
         if sources.is_empty() {
             if !Self::hash_inner(config::static_sources(), self.state.sources()) {
                 bail!("There are no fetched sources");
             }
         } else {
-            let globs = Globs::permissive(&sources)?;
+            let globs = Globs::permissive(sources)?;
             if !Self::hash_inner(
                 config::static_sources_matching_globs(&globs),
                 self.state.sources_matching_globs(&globs),
             ) {
-                let sources = sources.as_slice();
                 bail!("{} didn't match any fetched sources", sources.pretty());
             }
         };
         Ok(())
     }
 
-    fn hash_inner<'a, S, D>(static_sources: S, dynamic_sources: D) -> bool
+    fn hash_inner<'a, 'b, S, D>(static_sources: S, dynamic_sources: D) -> bool
     where
-        S: Iterator<Item = &'static SourceName>,
-        D: Iterator<Item = &'a SourceIdent>,
+        S: Iterator<Item = &'a SourceName>,
+        D: Iterator<Item = &'b SourceIdent>,
     {
         let mut has_sources = false;
         for source in static_sources {
