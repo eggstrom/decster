@@ -4,7 +4,7 @@ use std::{
     rc::Rc,
 };
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use crossterm::style::Stylize;
 use indexmap::IndexMap;
 use toml::Value;
@@ -83,7 +83,8 @@ impl ModuleSet {
     pub fn enable(&self, state: &mut State, name: &str) -> Result<()> {
         state.add_module(name);
         for link in self.links()? {
-            link.create(state, name, &self.context()?)?
+            link.create(state, name, &self.context()?)
+                .with_context(|| format!("Couldn't create link: {link}"))?
         }
         Ok(())
     }

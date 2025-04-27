@@ -4,7 +4,7 @@ use std::{
     fs::{self, File},
     io::Write,
     os::unix::{self, fs::MetadataExt},
-    path::Path,
+    path::{Path, PathBuf},
     rc::Rc,
 };
 
@@ -34,7 +34,8 @@ enum LinkKind {
     Template,
 }
 
-#[derive(Eq, Ord, PartialOrd)]
+#[derive(Display, Eq, Ord, PartialOrd)]
+#[display("{} -> {source}", path.pretty())]
 pub struct ModuleLink<'a> {
     kind: LinkKind,
     path: &'a Path,
@@ -80,12 +81,11 @@ impl<'a> ModuleLink<'a> {
         context: &HashMap<&str, &Value>,
     ) -> Result<()> {
         let source_path = self.source.fetch(state, module, self.path)?;
+        let link_path = self.untildefy(&self.path);
+        self.create_path(state, module, &link_path)?;
 
         utils::fs::walk_dir_rel(source_path, false, false, |path, rel_path| {
-            let mut new_path = match &self.user {
-                Some(user) => user.untildefy(self.path),
-                None => env::untildefy(self.path),
-            };
+            let mut new_path = Cow::Borrowed(link_path.as_ref());
             if rel_path.parent().is_some() {
                 new_path = Cow::Owned(new_path.join(rel_path));
             }
@@ -93,11 +93,7 @@ impl<'a> ModuleLink<'a> {
             if state.is_path_owned(&new_path) {
                 bail!("Path is used by another module");
             } else if path.is_dir() {
-                if !new_path.is_dir() {
-                    fs::create_dir(&new_path)?;
-                    state.add_path(module, &new_path, PathInfo::Directory);
-                    self.change_owner(&new_path)?;
-                }
+                self.create_dir(state, module, &new_path)?;
             } else {
                 let info = match self.kind {
                     LinkKind::File => Self::create_file(path, &new_path),
@@ -114,6 +110,34 @@ impl<'a> ModuleLink<'a> {
             }
             Ok(())
         })?;
+        Ok(())
+    }
+
+    fn untildefy<'b>(&self, path: &'b Path) -> Cow<'b, Path> {
+        match &self.user {
+            Some(user) => user.untildefy(path),
+            None => env::untildefy(path),
+        }
+    }
+
+    fn create_dir(&self, state: &mut State, module: &str, path: &Path) -> Result<()> {
+        if !path.is_dir() {
+            fs::create_dir(&path)
+                .with_context(|| format!("Couldn't create directory: {}", path.pretty()))?;
+            state.add_path(module, &path, PathInfo::Directory);
+            self.change_owner(&path)?;
+        }
+        Ok(())
+    }
+
+    fn create_path(&self, state: &mut State, module: &str, path: &Path) -> Result<()> {
+        let mut components = PathBuf::from("");
+        if let Some(parent) = path.parent() {
+            for component in parent.components() {
+                components.push(component);
+                self.create_dir(state, module, &components)?;
+            }
+        }
         Ok(())
     }
 

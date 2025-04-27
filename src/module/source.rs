@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
+use crossterm::style::Stylize;
+use derive_more::Display;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
@@ -11,10 +13,11 @@ use crate::{
     utils::sha256::Sha256Hash,
 };
 
-#[derive(Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Deserialize, Display, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[serde(untagged)]
 pub enum ModuleSource {
     Named(SourcePath),
+    #[display("{}", "Unnamed".magenta())]
     Unnamed(HashableSource),
 }
 

@@ -12,6 +12,8 @@ use serde::{
 };
 use thiserror::Error;
 
+use crate::utils::pretty::Pretty;
+
 use super::name::{ParseSourceNameError, SourceName};
 
 #[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -35,6 +37,16 @@ impl SourcePath {
             full_path.push(path);
         }
         full_path
+    }
+}
+
+impl Display for SourcePath {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        self.name.fmt(f)?;
+        if let Some(path) = &self.path {
+            write!(f, "/{}", path.pretty())?;
+        }
+        Ok(())
     }
 }
 
