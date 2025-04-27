@@ -7,9 +7,10 @@ use crossterm::style::Stylize;
 use crate::{
     cli::{Cli, Command},
     global::{self, config, env},
+    globs::Globs,
     source::{ident::SourceIdent, name::SourceName},
     state::State,
-    utils::{glob::Globs, pretty::Pretty, sha256::Sha256Hash},
+    utils::{pretty::Pretty, sha256::Sha256Hash},
 };
 
 pub struct App {

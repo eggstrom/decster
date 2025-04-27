@@ -5,6 +5,7 @@ use std::process;
 mod app;
 mod cli;
 mod global;
+mod globs;
 #[cfg(feature = "http")]
 mod http;
 mod module;

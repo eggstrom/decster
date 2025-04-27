@@ -9,9 +9,10 @@ use serde::Deserialize;
 
 use crate::{
     cli::Behavior,
+    globs::Globs,
     module::Module,
     source::{hashable::HashableSource, name::SourceName},
-    utils::{self, glob::Globs, pretty::Pretty},
+    utils::{self, pretty::Pretty},
 };
 
 use super::env::Env;

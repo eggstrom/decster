@@ -13,7 +13,7 @@ use toml::Value;
 
 use crate::{
     global::{config, env::User},
-    utils::glob::Globs,
+    globs::Globs,
 };
 
 pub mod link;

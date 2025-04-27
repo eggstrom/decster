@@ -7,7 +7,7 @@ use anyhow::Result;
 use globset::{GlobBuilder, GlobSet};
 use serde::{
     Deserialize, Deserializer,
-    de::{self, Visitor},
+    de::{self, SeqAccess, Visitor},
 };
 
 #[derive(Default)]
@@ -80,7 +80,7 @@ impl<'de> Visitor<'de> for GlobsVisitor {
 
     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
     where
-        A: de::SeqAccess<'de>,
+        A: SeqAccess<'de>,
     {
         let mut globs = Vec::new();
         while let Some(glob) = seq.next_element::<String>()? {

@@ -11,9 +11,10 @@ use path::PathInfo;
 
 use crate::{
     global::env,
+    globs::Globs,
     module::set::ModuleSet,
     source::{hashable::HashableSource, ident::SourceIdent},
-    utils::{glob::Globs, pretty::Pretty},
+    utils::pretty::Pretty,
 };
 
 pub mod path;
