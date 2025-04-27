@@ -81,7 +81,7 @@ impl<'a> ModuleLink<'a> {
         context: &HashMap<&str, &Value>,
     ) -> Result<()> {
         let source_path = self.source.fetch(state, module, self.path)?;
-        let link_path = self.untildefy(&self.path);
+        let link_path = self.untildefy(self.path);
         self.create_path(state, module, &link_path)?;
 
         utils::fs::walk_dir_rel(source_path, false, false, |path, rel_path| {
@@ -122,10 +122,10 @@ impl<'a> ModuleLink<'a> {
 
     fn create_dir(&self, state: &mut State, module: &str, path: &Path) -> Result<()> {
         if !path.is_dir() {
-            fs::create_dir(&path)
+            fs::create_dir(path)
                 .with_context(|| format!("Couldn't create directory: {}", path.pretty()))?;
-            state.add_path(module, &path, PathInfo::Directory);
-            self.change_owner(&path)?;
+            state.add_path(module, path, PathInfo::Directory);
+            self.change_owner(path)?;
         }
         Ok(())
     }

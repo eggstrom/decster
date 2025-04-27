@@ -7,14 +7,13 @@ use std::{
 use anyhow::{Context, Result, bail};
 use bincode::{Decode, Encode, config::Configuration};
 use crossterm::style::Stylize;
-use globset::GlobSet;
 use path::PathInfo;
 
 use crate::{
     global::env,
     module::set::ModuleSet,
     source::{hashable::HashableSource, ident::SourceIdent},
-    utils::{glob::GlobSetExt, pretty::Pretty},
+    utils::{glob::Globs, pretty::Pretty},
 };
 
 pub mod path;
@@ -48,18 +47,12 @@ impl State {
     }
 
     pub fn sources(&self) -> impl ExactSizeIterator<Item = &SourceIdent> {
-        self.sources.iter().map(|(ident, _)| ident)
+        self.sources.keys()
     }
 
-    pub fn sources_matching_globs<I>(&self, globs: I) -> Result<impl Iterator<Item = &SourceIdent>>
-    where
-        I: IntoIterator,
-        I::Item: AsRef<str>,
-    {
-        let glob_set = GlobSet::from_globs(globs)?;
-        Ok(self
-            .sources()
-            .filter(move |ident| ident.is_named_and(|name| glob_set.is_match(name))))
+    pub fn sources_matching_globs(&self, globs: &Globs) -> impl Iterator<Item = &SourceIdent> {
+        self.sources()
+            .filter(move |ident| ident.is_named_and(|name| globs.is_match(name)))
     }
 
     pub fn is_source_fetched(&self, ident: &SourceIdent, source: &HashableSource) -> bool {
@@ -105,21 +98,19 @@ impl State {
             .map(|(name, paths)| (name.as_str(), paths.as_slice()))
     }
 
-    pub fn modules_matching_globs(&self, globs: &[String]) -> Result<Vec<String>> {
-        let glob_set = GlobSet::from_globs(globs)?;
-        let matches: Vec<_> = self
-            .module_paths
-            .keys()
-            .filter(move |name| glob_set.is_match(name))
-            .cloned()
-            .collect();
-        if matches.is_empty() {
-            bail!("{} didn't match any enabled modules", globs.pretty());
-        }
-        Ok(matches)
+    pub fn modules(&self) -> Vec<String> {
+        self.module_paths.keys().cloned().collect()
     }
 
-    pub fn enable_module(&mut self, name: &str, modules: &ModuleSet) -> Result<()> {
+    pub fn modules_matching_globs(&self, globs: &Globs) -> Vec<String> {
+        self.module_paths
+            .keys()
+            .filter(move |name| globs.is_match(name))
+            .cloned()
+            .collect()
+    }
+
+    pub fn enable_module(&mut self, name: &str, modules: ModuleSet) -> Result<()> {
         if let Err(err) = modules
             .enable(self, name)
             .with_context(|| format!("Couldn't enable module {}", name.magenta()))
@@ -132,10 +123,10 @@ impl State {
         Ok(())
     }
 
-    fn disable_module(&mut self, name: &str) -> Result<()> {
+    pub fn disable_module(&mut self, module: &str) -> Result<()> {
         let paths = self
             .module_paths
-            .get_mut(name)
+            .get_mut(module)
             .expect("Whether `name` exists should be checked before calling this method");
         // Paths are removed in reverse order to make sure directories are
         // removed last.
@@ -145,52 +136,14 @@ impl State {
             self.paths.remove(path);
             paths.remove(i);
         }
-        self.module_paths.remove(name);
-        println!("Disabled {}", name.magenta());
+        self.module_paths.remove(module);
         Ok(())
     }
 
-    pub fn disable_modules_matching_globs(&mut self, globs: &[String]) -> Result<()> {
-        for name in self.modules_matching_globs(globs)? {
-            if let Err(err) = self.disable_module(&name) {
-                eprintln!("{} {err:?}", "error:".red());
-            }
-        }
-        Ok(())
-    }
-
-    fn can_update(&self) -> Result<()> {
-        if self.module_paths.is_empty() {
-            bail!("There are no enabled modules to update");
-        }
-        Ok(())
-    }
-
-    fn update_module(&mut self, name: &str, modules: Option<&ModuleSet>) -> Result<()> {
+    pub fn update_module(&mut self, name: &str, modules: Option<ModuleSet>) -> Result<()> {
         self.disable_module(name)?;
         if let Some(modules) = modules {
             self.enable_module(name, modules)?;
-        }
-        println!("Updated {}", name.magenta());
-        Ok(())
-    }
-
-    pub fn update_all_modules(&mut self) -> Result<()> {
-        self.can_update()?;
-        for name in self.module_paths.keys().cloned().collect::<Vec<_>>() {
-            if let Err(err) = self.update_module(&name, ModuleSet::new(&name).ok().as_ref()) {
-                eprintln!("{} {err:?}", "error:".red());
-            }
-        }
-        Ok(())
-    }
-
-    pub fn update_modules_matching_globs(&mut self, globs: &[String]) -> Result<()> {
-        self.can_update()?;
-        for name in self.modules_matching_globs(globs)? {
-            if let Err(err) = self.update_module(&name, ModuleSet::new(&name).ok().as_ref()) {
-                eprintln!("{} {err:?}", "error:".red());
-            }
         }
         Ok(())
     }

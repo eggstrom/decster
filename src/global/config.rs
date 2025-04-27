@@ -4,15 +4,14 @@ use std::{
     path::Path,
 };
 
-use anyhow::{Context, Result, anyhow};
-use globset::GlobSet;
+use anyhow::{Context, Result};
 use serde::Deserialize;
 
 use crate::{
     cli::Behavior,
     module::Module,
     source::{hashable::HashableSource, name::SourceName},
-    utils::{self, glob::GlobSetExt, pretty::Pretty},
+    utils::{self, glob::Globs, pretty::Pretty},
 };
 
 use super::env::Env;
@@ -117,23 +116,15 @@ pub fn static_sources() -> impl ExactSizeIterator<Item = &'static SourceName> {
     config().static_sources.iter()
 }
 
-pub fn static_sources_matching_globs<I>(
-    globs: I,
-) -> Result<impl Iterator<Item = &'static SourceName>>
-where
-    I: IntoIterator,
-    I::Item: AsRef<str>,
-{
-    let glob_set = GlobSet::from_globs(globs)?;
-    Ok(static_sources().filter(move |name| glob_set.is_match(name)))
+pub fn static_sources_matching_globs(globs: &Globs) -> impl Iterator<Item = &'static SourceName> {
+    static_sources().filter(move |name| globs.is_match(name))
 }
 
-pub fn module(name: &str) -> Result<(&'static str, &'static Module)> {
+pub fn module(name: &str) -> Option<(&'static str, &'static Module)> {
     config()
         .modules
         .get_key_value(name)
         .map(|(name, module)| (name.as_str(), module))
-        .ok_or(anyhow!("Module isn't defined"))
 }
 
 pub fn modules() -> impl Iterator<Item = (&'static str, &'static Module)> {
@@ -143,13 +134,8 @@ pub fn modules() -> impl Iterator<Item = (&'static str, &'static Module)> {
         .map(|(name, module)| (name.as_str(), module))
 }
 
-pub fn modules_matching_globs<I>(
-    globs: I,
-) -> Result<impl Iterator<Item = &'static str>, globset::Error>
-where
-    I: IntoIterator,
-    I::Item: AsRef<str>,
-{
-    let glob_set = GlobSet::from_globs(globs)?;
-    Ok(modules().filter_map(move |(name, _)| glob_set.is_match(name).then_some(name)))
+pub fn modules_matching_globs(
+    globs: &Globs,
+) -> impl Iterator<Item = (&'static str, &'static Module)> {
+    modules().filter(move |(name, _)| globs.is_match(name))
 }

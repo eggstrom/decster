@@ -1,15 +1,20 @@
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashMap},
     fs,
     path::{Path, PathBuf},
 };
 
 use anyhow::Result;
+use indexmap::IndexMap;
 use serde::Deserialize;
+use set::ModuleSet;
 use source::ModuleSource;
 use toml::Value;
 
-use crate::global::env::User;
+use crate::{
+    global::{config, env::User},
+    utils::glob::Globs,
+};
 
 pub mod link;
 pub mod set;
@@ -19,9 +24,9 @@ pub mod source;
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Module {
     #[serde(default)]
-    pub imports: HashSet<String>,
+    imports: Globs,
     #[serde(default)]
-    pub user: Option<String>,
+    user: Option<String>,
 
     #[serde(default)]
     files: BTreeMap<PathBuf, ModuleSource>,
@@ -52,5 +57,26 @@ impl Module {
             .map(|user| User::new(user))
             .transpose()?
             .filter(|user| !user.is_current()))
+    }
+
+    pub fn import<'a>(&'a self, name: &'a str) -> Result<ModuleSet<'a>> {
+        let mut modules = IndexMap::from([(name, self)]);
+        Self::import_inner(&mut modules, &self.imports)?;
+        Ok(ModuleSet { modules })
+    }
+
+    fn import_inner(
+        modules: &mut IndexMap<&str, &Module>,
+        // imports: &HashSet<String>,
+        imports: &Globs,
+    ) -> Result<()> {
+        // let globs = Globs::strict(imports)?;
+        for (name, module) in config::modules_matching_globs(imports) {
+            if !modules.contains_key(name) {
+                modules.insert(name, module);
+                Self::import_inner(modules, &module.imports)?;
+            }
+        }
+        Ok(())
     }
 }

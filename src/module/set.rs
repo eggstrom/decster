@@ -9,35 +9,15 @@ use crossterm::style::Stylize;
 use indexmap::IndexMap;
 use toml::Value;
 
-use crate::{
-    global::{config, env::User},
-    state::State,
-};
+use crate::{global::env::User, state::State};
 
 use super::{Module, link::ModuleLink, source::ModuleSource};
 
-pub struct ModuleSet {
-    modules: IndexMap<&'static str, &'static Module>,
+pub struct ModuleSet<'a> {
+    pub(super) modules: IndexMap<&'a str, &'a Module>,
 }
 
-impl ModuleSet {
-    pub fn new(name: &str) -> Result<Self> {
-        let mut modules = IndexMap::new();
-        Self::new_inner(name, &mut modules)?;
-        Ok(ModuleSet { modules })
-    }
-
-    fn new_inner(name: &str, modules: &mut IndexMap<&str, &Module>) -> Result<()> {
-        if !modules.contains_key(name) {
-            let (name, module) = config::module(name)?;
-            modules.insert(name, module);
-            for import in config::modules_matching_globs(&module.imports)? {
-                Self::new_inner(import, modules)?;
-            }
-        }
-        Ok(())
-    }
-
+impl<'a> ModuleSet<'a> {
     pub fn links(&self) -> Result<impl ExactSizeIterator<Item = ModuleLink> + use<'_>> {
         let mut links = BTreeSet::new();
         for (_, module) in self.modules.iter() {
@@ -53,9 +33,9 @@ impl ModuleSet {
 
     fn links_inner(
         user: Option<&Rc<User>>,
-        input: &'static BTreeMap<PathBuf, ModuleSource>,
-        output: &mut BTreeSet<ModuleLink<'static>>,
-        f: fn(&'static Path, &'static ModuleSource, Option<&Rc<User>>) -> ModuleLink<'static>,
+        input: &'a BTreeMap<PathBuf, ModuleSource>,
+        output: &mut BTreeSet<ModuleLink<'a>>,
+        f: fn(&'a Path, &'a ModuleSource, Option<&Rc<User>>) -> ModuleLink<'a>,
     ) -> Result<()> {
         for (path, source) in input.iter() {
             let link = f(path, source, user);
