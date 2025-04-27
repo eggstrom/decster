@@ -1,8 +1,6 @@
-use std::{path::PathBuf, str::FromStr};
+use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};
-
-use crate::source::name::SourceName;
 
 #[derive(Debug, Parser)]
 pub struct Cli {
@@ -36,19 +34,19 @@ pub enum Command {
     #[command(alias = "e")]
     /// Enable modules
     Enable {
-        #[arg(required = true, value_name = "PATTERNS")]
+        #[arg(required = true, value_name = "MODULES")]
         modules: Vec<String>,
     },
     /// Disable modules
     #[command(alias = "d")]
     Disable {
-        #[arg(required = true, value_name = "PATTERNS")]
+        #[arg(required = true, value_name = "MODULES")]
         modules: Vec<String>,
     },
     /// Disable and re-enable modules
     #[command(alias = "u")]
     Update {
-        #[arg(value_name = "PATTERNS")]
+        #[arg(value_name = "MODULES")]
         modules: Vec<String>,
     },
     /// Show module definitions
@@ -60,7 +58,7 @@ pub enum Command {
     /// Show hashes of fetched sources
     #[command(alias = "h")]
     Hash {
-        #[arg(value_parser = SourceName::from_str)]
-        sources: Vec<SourceName>,
+        #[arg(value_name = "SOURCES")]
+        sources: Vec<String>,
     },
 }

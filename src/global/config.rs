@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet},
     fs,
     path::Path,
 };
@@ -12,7 +12,7 @@ use crate::{
     cli::Behavior,
     module::Module,
     source::{hashable::HashableSource, name::SourceName},
-    utils::{self, glob::GlobSetExt},
+    utils::{self, glob::GlobSetExt, pretty::Pretty},
 };
 
 use super::env::Env;
@@ -26,9 +26,9 @@ pub(super) struct Config {
     #[serde(skip, default)]
     modules: BTreeMap<String, Module>,
     #[serde(skip, default)]
-    static_sources: HashSet<SourceName>,
+    static_sources: BTreeSet<SourceName>,
     #[serde(skip, default)]
-    dynamic_sources: HashMap<SourceName, HashableSource>,
+    dynamic_sources: BTreeMap<SourceName, HashableSource>,
 }
 
 impl Config {
@@ -47,7 +47,7 @@ impl Config {
     {
         let path = path.as_ref();
         let text = fs::read_to_string(path)
-            .with_context(|| format!("Couldn't read config at {}", path.display()))?;
+            .with_context(|| format!("Couldn't read config at {}", path.pretty()))?;
         Ok(toml::from_str(&text)?)
     }
 
@@ -105,12 +105,27 @@ pub fn quiet() -> bool {
     config().behavior.quiet
 }
 
-pub fn has_source(name: &SourceName) -> bool {
+pub fn has_static_source(name: &SourceName) -> bool {
     config().static_sources.contains(name)
 }
 
 pub fn dynamic_source(name: &SourceName) -> Option<&'static HashableSource> {
     config().dynamic_sources.get(name)
+}
+
+pub fn static_sources() -> impl ExactSizeIterator<Item = &'static SourceName> {
+    config().static_sources.iter()
+}
+
+pub fn static_sources_matching_globs<I>(
+    globs: I,
+) -> Result<impl Iterator<Item = &'static SourceName>>
+where
+    I: IntoIterator,
+    I::Item: AsRef<str>,
+{
+    let glob_set = GlobSet::from_globs(globs)?;
+    Ok(static_sources().filter(move |name| glob_set.is_match(name)))
 }
 
 pub fn module(name: &str) -> Result<(&'static str, &'static Module)> {

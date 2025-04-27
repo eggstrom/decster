@@ -47,6 +47,21 @@ impl State {
         bincode::config::standard()
     }
 
+    pub fn sources(&self) -> impl ExactSizeIterator<Item = &SourceIdent> {
+        self.sources.iter().map(|(ident, _)| ident)
+    }
+
+    pub fn sources_matching_globs<I>(&self, globs: I) -> Result<impl Iterator<Item = &SourceIdent>>
+    where
+        I: IntoIterator,
+        I::Item: AsRef<str>,
+    {
+        let glob_set = GlobSet::from_globs(globs)?;
+        Ok(self
+            .sources()
+            .filter(move |ident| ident.is_named_and(|name| glob_set.is_match(name))))
+    }
+
     pub fn is_source_fetched(&self, ident: &SourceIdent, source: &HashableSource) -> bool {
         self.sources
             .get(ident)

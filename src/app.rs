@@ -1,4 +1,4 @@
-use std::{collections::HashSet, fs, path::Path};
+use std::{fmt::Display, path::Path};
 
 use anyhow::{Result, bail};
 use clap::Parser;
@@ -8,7 +8,7 @@ use crate::{
     cli::{Cli, Command},
     global::{self, config, env},
     module::set::ModuleSet,
-    source::name::SourceName,
+    source::{ident::SourceIdent, name::SourceName},
     state::State,
     utils::{pretty::Pretty, sha256::Sha256Hash},
 };
@@ -30,7 +30,7 @@ impl App {
             Command::Update { modules } => app.update(modules)?,
             Command::List => app.list(),
             Command::Paths => app.paths()?,
-            Command::Hash { sources } => app.hash(sources.into_iter().collect())?,
+            Command::Hash { sources } => app.hash(sources)?,
         }
         Ok(())
     }
@@ -94,25 +94,50 @@ impl App {
         Ok(())
     }
 
-    fn hash(&self, sources: HashSet<SourceName>) -> Result<()> {
-        self.hash_dir("Static", env::static_sources(), &sources)?;
-        self.hash_dir("Named", env::named_sources(), &sources)?;
+    fn hash(&self, sources: Vec<String>) -> Result<()> {
+        if sources.is_empty() {
+            if !Self::hash_inner(config::static_sources(), self.state.sources()) {
+                bail!("There are no fetched sources");
+            }
+        } else {
+            if !Self::hash_inner(
+                config::static_sources_matching_globs(&sources)?,
+                self.state.sources_matching_globs(&sources)?,
+            ) {
+                let sources = sources.as_slice();
+                bail!("{} didn't match any fetched sources", sources.pretty());
+            }
+        };
         Ok(())
     }
 
-    fn hash_dir(&self, text: &str, dir: &Path, sources: &HashSet<SourceName>) -> Result<()> {
-        let mut sources: Vec<_> = fs::read_dir(dir)?
-            .filter_map(Result::ok)
-            .map(|entry| (SourceName::from(entry.file_name()), entry.path()))
-            .filter(|(name, _)| sources.is_empty() || sources.contains(name))
-            .collect();
-        sources.sort_unstable();
-        if !sources.is_empty() {
-            println!("{} sources:", text);
-            for (name, path) in sources {
-                println!("  {}: {}", name, Sha256Hash::from_path(&path)?)
-            }
+    fn hash_inner<'a, S, D>(static_sources: S, dynamic_sources: D) -> bool
+    where
+        S: Iterator<Item = &'static SourceName>,
+        D: Iterator<Item = &'a SourceIdent>,
+    {
+        let mut has_sources = false;
+        for source in static_sources {
+            print!("({}) ", "Static".blue());
+            Self::print_source_hash(source, &env::static_sources().join(source.to_string()));
+            has_sources = true;
         }
-        Ok(())
+        for source in dynamic_sources {
+            print!("({}) ", "Dynamic".blue());
+            Self::print_source_hash(source, &env::static_sources().join(source.to_string()));
+            has_sources = true;
+        }
+        has_sources
+    }
+
+    fn print_source_hash<D>(ident: D, path: &Path)
+    where
+        D: Display,
+    {
+        print!("{ident}: ");
+        match Sha256Hash::from_path(path) {
+            Ok(hash) => println!("{hash}"),
+            Err(err) => println!("{} {err:?}", "error:".red()),
+        }
     }
 }
