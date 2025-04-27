@@ -34,21 +34,18 @@ pub enum Command {
     #[command(alias = "e")]
     /// Enable modules
     Enable {
-        #[arg(required = true, value_name = "MODULES")]
+        #[arg(required = true)]
         modules: Vec<String>,
     },
     /// Disable modules
     #[command(alias = "d")]
     Disable {
-        #[arg(required = true, value_name = "MODULES")]
+        #[arg(required = true)]
         modules: Vec<String>,
     },
     /// Disable and re-enable modules
     #[command(alias = "u")]
-    Update {
-        #[arg(value_name = "MODULES")]
-        modules: Vec<String>,
-    },
+    Update { modules: Vec<String> },
     /// Show module definitions
     #[command(alias = "l")]
     List,
@@ -57,8 +54,5 @@ pub enum Command {
     Paths,
     /// Show hashes of fetched sources
     #[command(alias = "h")]
-    Hash {
-        #[arg(value_name = "SOURCES")]
-        sources: Vec<String>,
-    },
+    Hash { sources: Vec<String> },
 }
