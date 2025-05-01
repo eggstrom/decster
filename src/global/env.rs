@@ -1,53 +1,16 @@
 use std::{
     borrow::Cow,
     fs,
-    os::unix,
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Result, anyhow};
 use nix::unistd;
-
-use crate::utils::pretty::Pretty;
-
-#[derive(Eq, Ord, PartialEq, PartialOrd)]
-pub struct User {
-    uid: u32,
-    gid: u32,
-    home: PathBuf,
-}
-
-impl User {
-    pub fn new(name: &str) -> Result<Self> {
-        unistd::User::from_name(name)?
-            .map(|user| User {
-                uid: user.uid.as_raw(),
-                gid: user.gid.as_raw(),
-                home: user.dir,
-            })
-            .ok_or(anyhow!("User doesn't exist"))
-    }
-
-    pub fn is_current(&self) -> bool {
-        self.uid == uid()
-    }
-
-    pub fn tildefy<'a>(&self, path: &'a Path) -> Cow<'a, Path> {
-        tildefy_with(path, &self.home)
-    }
-
-    pub fn untildefy<'a>(&self, path: &'a Path) -> Cow<'a, Path> {
-        untildefy_with(path, &self.home)
-    }
-
-    pub fn change_owner(&self, path: &Path) -> Result<()> {
-        unix::fs::lchown(path, Some(self.uid), Some(self.gid))
-            .with_context(|| format!("Couldn't change owner of {}", tildefy(path).pretty()))
-    }
-}
 
 pub(super) struct Env {
     pub uid: u32,
+    pub gid: u32,
+
     pub home: PathBuf,
     pub config: PathBuf,
     pub modules: PathBuf,
@@ -78,6 +41,8 @@ impl Env {
 
         Ok(Env {
             uid: unistd::getuid().as_raw(),
+            gid: unistd::getgid().as_raw(),
+
             home,
             config: config.join("config.toml"),
             modules: config.join("modules"),
@@ -94,8 +59,12 @@ fn env() -> &'static Env {
     &super::state().env
 }
 
-fn uid() -> u32 {
+pub fn uid() -> u32 {
     env().uid
+}
+
+pub fn gid() -> u32 {
+    env().gid
 }
 
 pub fn home() -> &'static Path {
@@ -120,7 +89,7 @@ pub fn state() -> &'static Path {
 
 const TILDE: &str = "~";
 
-fn tildefy_with<'a>(path: &'a Path, home: &Path) -> Cow<'a, Path> {
+pub fn tildefy_with<'a>(path: &'a Path, home: &Path) -> Cow<'a, Path> {
     match path.strip_prefix(home) {
         Ok(path) => match path.parent() {
             None => Cow::Borrowed(Path::new(TILDE)),
@@ -130,7 +99,7 @@ fn tildefy_with<'a>(path: &'a Path, home: &Path) -> Cow<'a, Path> {
     }
 }
 
-fn untildefy_with<'a>(path: &'a Path, home: &Path) -> Cow<'a, Path> {
+pub fn untildefy_with<'a>(path: &'a Path, home: &Path) -> Cow<'a, Path> {
     match path.strip_prefix(TILDE) {
         Ok(path) => Cow::Owned(home.join(path)),
         Err(_) => Cow::Borrowed(path),

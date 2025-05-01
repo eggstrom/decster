@@ -5,7 +5,6 @@ use std::{
     io::Write,
     os::unix::{self, fs::MetadataExt},
     path::{Path, PathBuf},
-    rc::Rc,
 };
 
 use anyhow::{Context, Result, bail};
@@ -14,8 +13,8 @@ use derive_more::Display;
 use toml::Value;
 
 use crate::{
-    fs::mode::Mode,
-    global::env::{self, User},
+    fs::{mode::Mode, owner::OwnerIds},
+    global::env,
     state::{State, path::PathInfo},
     upon,
     utils::{pretty::Pretty, sha256::Sha256Hash},
@@ -41,7 +40,7 @@ pub struct ModuleLink<'a> {
     kind: LinkKind,
     path: &'a Path,
     source: &'a ModuleSource,
-    user: Option<Rc<User>>,
+    owner: Option<OwnerIds>,
     mode: Option<Mode>,
 }
 
@@ -50,14 +49,14 @@ impl<'a> ModuleLink<'a> {
         kind: LinkKind,
         path: &'a Path,
         source: &'a ModuleSource,
-        user: Option<&Rc<User>>,
+        owner: Option<OwnerIds>,
         mode: Option<Mode>,
     ) -> Self {
         ModuleLink {
             kind,
             path,
             source,
-            user: user.map(Rc::clone),
+            owner,
             mode,
         }
     }
@@ -69,7 +68,7 @@ impl<'a> ModuleLink<'a> {
         context: &HashMap<&str, &Value>,
     ) -> Result<()> {
         let source_path = self.source.fetch(state, module, self.path)?;
-        let link_path = self.untildefy(self.path);
+        let link_path = env::untildefy(self.path);
         self.create_path(state, module, &link_path)?;
 
         crate::fs::walk_dir_rel(source_path, false, false, |path, rel_path| {
@@ -94,19 +93,11 @@ impl<'a> ModuleLink<'a> {
                     format!("Couldn't create {} ({})", new_path.pretty(), self.kind)
                 })?;
                 state.add_path(module, &new_path, info);
-                self.change_owner(&new_path)?;
-                self.change_mode(&new_path)?;
+                self.change_permissions(&new_path)?;
             }
             Ok(())
         })?;
         Ok(())
-    }
-
-    fn untildefy<'b>(&self, path: &'b Path) -> Cow<'b, Path> {
-        match &self.user {
-            Some(user) => user.untildefy(path),
-            None => env::untildefy(path),
-        }
     }
 
     fn create_dir(&self, state: &mut State, module: &str, path: &Path) -> Result<()> {
@@ -114,7 +105,7 @@ impl<'a> ModuleLink<'a> {
             fs::create_dir(path)
                 .with_context(|| format!("Couldn't create directory: {}", path.pretty()))?;
             state.add_path(module, path, PathInfo::Directory);
-            self.change_owner(path)?;
+            self.change_permissions(path)?;
         }
         Ok(())
     }
@@ -163,14 +154,10 @@ impl<'a> ModuleLink<'a> {
         Ok(PathInfo::File { size, hash })
     }
 
-    fn change_owner(&self, path: &Path) -> Result<()> {
-        if let Some(user) = &self.user {
-            user.change_owner(path)?;
+    fn change_permissions(&self, path: &Path) -> Result<()> {
+        if let Some(owner) = &self.owner {
+            owner.change_owner(path)?;
         }
-        Ok(())
-    }
-
-    fn change_mode(&self, path: &Path) -> Result<()> {
         if let Some(mode) = &self.mode {
             mode.change_mode(path)?;
         }

@@ -75,7 +75,7 @@ impl App {
         if modules.is_empty() {
             match self.update_inner(self.state.modules()) {
                 Ok(false) => bail!("There are no enabled modules"),
-                Err(err) => eprintln!("{} {err}", "error:".red()),
+                Err(err) => eprintln!("{} {err:?}", "error:".red()),
                 _ => (),
             }
         } else {

@@ -9,6 +9,7 @@ use anyhow::Result;
 use walkdir::WalkDir;
 
 pub mod mode;
+pub mod owner;
 
 /// Calls `f` on every path in a directory.
 ///

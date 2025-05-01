@@ -1,7 +1,6 @@
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     path::PathBuf,
-    rc::Rc,
 };
 
 use anyhow::{Context, Result, bail};
@@ -9,7 +8,10 @@ use crossterm::style::Stylize;
 use indexmap::IndexMap;
 use toml::Value;
 
-use crate::{fs::mode::Mode, global::env::User, state::State};
+use crate::{
+    fs::{mode::Mode, owner::OwnerIds},
+    state::State,
+};
 
 use super::{
     Module,
@@ -25,26 +27,25 @@ impl<'a> ModuleSet<'a> {
     pub fn links(&self) -> Result<impl ExactSizeIterator<Item = ModuleLink>> {
         let mut links = BTreeSet::new();
         for (_, module) in self.modules.iter() {
-            let user = module.user()?.map(Rc::new);
-            let u = user.as_ref();
+            let o = module.owner.as_ref().map(|owner| owner.ids()).transpose()?;
             let m = module.mode;
-            Self::links_inner(u, m, &module.files, &mut links, LinkKind::File)?;
-            Self::links_inner(u, m, &module.hard_links, &mut links, LinkKind::HardLink)?;
-            Self::links_inner(u, m, &module.symlinks, &mut links, LinkKind::Symlink)?;
-            Self::links_inner(u, m, &module.templates, &mut links, LinkKind::Template)?;
+            Self::links_inner(o, m, &module.files, &mut links, LinkKind::File)?;
+            Self::links_inner(o, m, &module.hard_links, &mut links, LinkKind::HardLink)?;
+            Self::links_inner(o, m, &module.symlinks, &mut links, LinkKind::Symlink)?;
+            Self::links_inner(o, m, &module.templates, &mut links, LinkKind::Template)?;
         }
         Ok(links.into_iter())
     }
 
     fn links_inner(
-        user: Option<&Rc<User>>,
+        owner: Option<OwnerIds>,
         mode: Option<Mode>,
         input: &'a BTreeMap<PathBuf, ModuleSource>,
         output: &mut BTreeSet<ModuleLink<'a>>,
         kind: LinkKind,
     ) -> Result<()> {
         for (path, source) in input.iter() {
-            let link = ModuleLink::new(kind, path, source, user, mode);
+            let link = ModuleLink::new(kind, path, source, owner, mode);
             if !output.insert(link) {
                 bail!("Path {} is used multiple times", path.display());
             }

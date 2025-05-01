@@ -12,8 +12,8 @@ use source::ModuleSource;
 use toml::Value;
 
 use crate::{
-    fs::mode::Mode,
-    global::{config, env::User},
+    fs::{mode::Mode, owner::Owner},
+    global::config,
     globs::Globs,
 };
 
@@ -28,7 +28,7 @@ pub struct Module {
     imports: Globs,
 
     #[serde(default)]
-    user: Option<String>,
+    owner: Option<Owner>,
     #[serde(default)]
     mode: Option<Mode>,
 
@@ -42,7 +42,7 @@ pub struct Module {
     templates: BTreeMap<PathBuf, ModuleSource>,
 
     #[serde(default)]
-    pub context: HashMap<String, Value>,
+    context: HashMap<String, Value>,
 }
 
 impl Module {
@@ -52,15 +52,6 @@ impl Module {
     {
         let path = path.as_ref();
         Ok(toml::from_str(&fs::read_to_string(path)?)?)
-    }
-
-    pub fn user(&self) -> Result<Option<User>> {
-        Ok(self
-            .user
-            .as_ref()
-            .map(|user| User::new(user))
-            .transpose()?
-            .filter(|user| !user.is_current()))
     }
 
     pub fn import<'a>(&'a self, name: &'a str) -> Result<ModuleSet<'a>> {
