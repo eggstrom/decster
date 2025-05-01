@@ -22,28 +22,28 @@ pub struct Behavior {
 
 #[derive(Clone, Debug, Subcommand)]
 pub enum Command {
-    #[command(alias = "e")]
+    #[command()]
     /// Enable modules
     Enable {
         #[arg(required = true)]
         modules: Vec<String>,
     },
     /// Disable modules
-    #[command(alias = "d")]
+    #[command()]
     Disable {
         #[arg(required = true)]
         modules: Vec<String>,
     },
     /// Disable and re-enable modules
-    #[command(alias = "u")]
+    #[command()]
     Update { modules: Vec<String> },
     /// Show module definitions
-    #[command(alias = "l")]
+    #[command()]
     List,
     /// Show owned paths
-    #[command(alias = "p")]
+    #[command()]
     Paths,
     /// Show hashes of fetched sources
-    #[command(alias = "h")]
+    #[command()]
     Hash { sources: Vec<String> },
 }
