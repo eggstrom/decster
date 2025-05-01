@@ -14,16 +14,17 @@ use derive_more::Display;
 use toml::Value;
 
 use crate::{
+    fs::mode::Mode,
     global::env::{self, User},
     state::{State, path::PathInfo},
     upon,
-    utils::{self, pretty::Pretty, sha256::Sha256Hash},
+    utils::{pretty::Pretty, sha256::Sha256Hash},
 };
 
 use super::source::ModuleSource;
 
-#[derive(Display, Eq, Ord, PartialEq, PartialOrd)]
-enum LinkKind {
+#[derive(Clone, Copy, Display, Eq, Ord, PartialEq, PartialOrd)]
+pub enum LinkKind {
     #[display("{}", "File".blue())]
     File,
     #[display("{}", "Hard Link".blue())]
@@ -41,37 +42,24 @@ pub struct ModuleLink<'a> {
     path: &'a Path,
     source: &'a ModuleSource,
     user: Option<Rc<User>>,
+    mode: Option<Mode>,
 }
 
 impl<'a> ModuleLink<'a> {
-    fn new(
+    pub fn new(
         kind: LinkKind,
         path: &'a Path,
         source: &'a ModuleSource,
         user: Option<&Rc<User>>,
+        mode: Option<Mode>,
     ) -> Self {
         ModuleLink {
             kind,
             path,
             source,
             user: user.map(Rc::clone),
+            mode,
         }
-    }
-
-    pub fn file(path: &'a Path, source: &'a ModuleSource, user: Option<&Rc<User>>) -> Self {
-        ModuleLink::new(LinkKind::File, path, source, user)
-    }
-
-    pub fn hard_link(path: &'a Path, source: &'a ModuleSource, user: Option<&Rc<User>>) -> Self {
-        ModuleLink::new(LinkKind::HardLink, path, source, user)
-    }
-
-    pub fn symlink(path: &'a Path, source: &'a ModuleSource, user: Option<&Rc<User>>) -> Self {
-        ModuleLink::new(LinkKind::Symlink, path, source, user)
-    }
-
-    pub fn template(path: &'a Path, source: &'a ModuleSource, user: Option<&Rc<User>>) -> Self {
-        ModuleLink::new(LinkKind::Template, path, source, user)
     }
 
     pub fn create(
@@ -84,7 +72,7 @@ impl<'a> ModuleLink<'a> {
         let link_path = self.untildefy(self.path);
         self.create_path(state, module, &link_path)?;
 
-        utils::fs::walk_dir_rel(source_path, false, false, |path, rel_path| {
+        crate::fs::walk_dir_rel(source_path, false, false, |path, rel_path| {
             let mut new_path = Cow::Borrowed(link_path.as_ref());
             if rel_path.parent().is_some() {
                 new_path = Cow::Owned(new_path.join(rel_path));
@@ -107,6 +95,7 @@ impl<'a> ModuleLink<'a> {
                 })?;
                 state.add_path(module, &new_path, info);
                 self.change_owner(&new_path)?;
+                self.change_mode(&new_path)?;
             }
             Ok(())
         })?;
@@ -144,7 +133,7 @@ impl<'a> ModuleLink<'a> {
     fn create_file(from: &Path, to: &Path) -> Result<PathInfo> {
         let size = from.symlink_metadata()?.size();
         let hash = Sha256Hash::from_file(from)?;
-        utils::fs::copy(from, to)?;
+        crate::fs::copy(from, to)?;
         Ok(PathInfo::File { size, hash })
     }
 
@@ -177,6 +166,13 @@ impl<'a> ModuleLink<'a> {
     fn change_owner(&self, path: &Path) -> Result<()> {
         if let Some(user) = &self.user {
             user.change_owner(path)?;
+        }
+        Ok(())
+    }
+
+    fn change_mode(&self, path: &Path) -> Result<()> {
+        if let Some(mode) = &self.mode {
+            mode.change_mode(path)?;
         }
         Ok(())
     }

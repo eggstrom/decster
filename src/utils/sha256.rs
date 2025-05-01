@@ -46,7 +46,7 @@ impl Sha256Hash {
         }
 
         let mut hasher = Sha256::new();
-        super::fs::walk_dir_rel(path, true, false, |path, rel_path| {
+        crate::fs::walk_dir_rel(path, true, false, |path, rel_path| {
             hasher.update(rel_path.to_string_lossy().as_ref());
             if path.is_symlink() {
                 hasher.update(path.read_link()?.to_string_lossy().as_ref());

@@ -8,6 +8,8 @@ use std::{
 use anyhow::Result;
 use walkdir::WalkDir;
 
+pub mod mode;
+
 /// Calls `f` on every path in a directory.
 ///
 /// `skip_root` determines whether the walked directory shouldn't be passed to

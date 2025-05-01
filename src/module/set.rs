@@ -1,6 +1,6 @@
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
-    path::{Path, PathBuf},
+    path::PathBuf,
     rc::Rc,
 };
 
@@ -9,36 +9,42 @@ use crossterm::style::Stylize;
 use indexmap::IndexMap;
 use toml::Value;
 
-use crate::{global::env::User, state::State};
+use crate::{fs::mode::Mode, global::env::User, state::State};
 
-use super::{Module, link::ModuleLink, source::ModuleSource};
+use super::{
+    Module,
+    link::{LinkKind, ModuleLink},
+    source::ModuleSource,
+};
 
 pub struct ModuleSet<'a> {
     pub(super) modules: IndexMap<&'a str, &'a Module>,
 }
 
 impl<'a> ModuleSet<'a> {
-    pub fn links(&self) -> Result<impl ExactSizeIterator<Item = ModuleLink> + use<'_>> {
+    pub fn links(&self) -> Result<impl ExactSizeIterator<Item = ModuleLink>> {
         let mut links = BTreeSet::new();
         for (_, module) in self.modules.iter() {
             let user = module.user()?.map(Rc::new);
-            let user = user.as_ref();
-            Self::links_inner(user, &module.files, &mut links, ModuleLink::file)?;
-            Self::links_inner(user, &module.hard_links, &mut links, ModuleLink::hard_link)?;
-            Self::links_inner(user, &module.symlinks, &mut links, ModuleLink::symlink)?;
-            Self::links_inner(user, &module.templates, &mut links, ModuleLink::template)?;
+            let u = user.as_ref();
+            let m = module.mode;
+            Self::links_inner(u, m, &module.files, &mut links, LinkKind::File)?;
+            Self::links_inner(u, m, &module.hard_links, &mut links, LinkKind::HardLink)?;
+            Self::links_inner(u, m, &module.symlinks, &mut links, LinkKind::Symlink)?;
+            Self::links_inner(u, m, &module.templates, &mut links, LinkKind::Template)?;
         }
         Ok(links.into_iter())
     }
 
     fn links_inner(
         user: Option<&Rc<User>>,
+        mode: Option<Mode>,
         input: &'a BTreeMap<PathBuf, ModuleSource>,
         output: &mut BTreeSet<ModuleLink<'a>>,
-        f: fn(&'a Path, &'a ModuleSource, Option<&Rc<User>>) -> ModuleLink<'a>,
+        kind: LinkKind,
     ) -> Result<()> {
         for (path, source) in input.iter() {
-            let link = f(path, source, user);
+            let link = ModuleLink::new(kind, path, source, user, mode);
             if !output.insert(link) {
                 bail!("Path {} is used multiple times", path.display());
             }

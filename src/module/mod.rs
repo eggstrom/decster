@@ -12,6 +12,7 @@ use source::ModuleSource;
 use toml::Value;
 
 use crate::{
+    fs::mode::Mode,
     global::{config, env::User},
     globs::Globs,
 };
@@ -25,8 +26,11 @@ pub mod source;
 pub struct Module {
     #[serde(default)]
     imports: Globs,
+
     #[serde(default)]
     user: Option<String>,
+    #[serde(default)]
+    mode: Option<Mode>,
 
     #[serde(default)]
     files: BTreeMap<PathBuf, ModuleSource>,
@@ -65,12 +69,7 @@ impl Module {
         Ok(ModuleSet { modules })
     }
 
-    fn import_inner(
-        modules: &mut IndexMap<&str, &Module>,
-        // imports: &HashSet<String>,
-        imports: &Globs,
-    ) -> Result<()> {
-        // let globs = Globs::strict(imports)?;
+    fn import_inner(modules: &mut IndexMap<&str, &Module>, imports: &Globs) -> Result<()> {
         for (name, module) in config::modules_matching_globs(imports) {
             if !modules.contains_key(name) {
                 modules.insert(name, module);

@@ -12,7 +12,7 @@ use crate::{
     globs::Globs,
     module::Module,
     source::{hashable::HashableSource, name::SourceName},
-    utils::{self, pretty::Pretty},
+    utils::pretty::Pretty,
 };
 
 use super::env::Env;
@@ -55,7 +55,7 @@ impl Config {
         if !dir.is_dir() {
             return Ok(());
         }
-        utils::fs::walk_dir_rel(dir, false, false, |path, rel_path| {
+        crate::fs::walk_dir_rel(dir, false, false, |path, rel_path| {
             if path.is_file() {
                 if let Some(name) = rel_path.to_string_lossy().strip_suffix(".toml") {
                     let module = Module::parse(path)?;

@@ -12,9 +12,9 @@ use bincode::{Decode, Encode};
 use reqwest::IntoUrl;
 use serde::{Deserialize, Serialize};
 
+use crate::global::env;
 #[cfg(feature = "http")]
 use crate::http;
-use crate::{global::env, utils};
 
 pub mod hashable;
 pub mod ident;
@@ -36,7 +36,7 @@ pub enum Source {
 impl Source {
     pub fn fetch(&self, source_path: &Path) -> Result<()> {
         if source_path.exists() || source_path.is_symlink() {
-            utils::fs::remove_all(source_path)?;
+            crate::fs::remove_all(source_path)?;
         }
 
         match self {
@@ -57,7 +57,7 @@ impl Source {
     }
 
     fn fetch_path(source_path: &Path, path: &Path) -> Result<()> {
-        utils::fs::copy_all(path, source_path)
+        crate::fs::copy_all(path, source_path)
     }
 
     #[cfg(feature = "http")]
