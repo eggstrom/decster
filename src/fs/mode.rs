@@ -1,7 +1,7 @@
 use std::{
     fmt::{self, Display, Formatter},
-    fs::{self, Permissions},
-    os::unix::fs::PermissionsExt,
+    fs::{self, Metadata, Permissions},
+    os::unix::fs::{MetadataExt, PermissionsExt},
     path::Path,
     str::FromStr,
 };
@@ -19,20 +19,39 @@ use crate::utils::pretty::Pretty;
 pub struct Mode(u16);
 
 impl Mode {
-    pub fn change_mode(&self, path: &Path) -> Result<()> {
-        fs::set_permissions(path, Permissions::from_mode(self.0 as u32))
-            .with_context(|| format!("Couldn't change mode of {}", path.pretty()))
+    const OFF_CHAR: char = '-';
+    const ON_CHARS: [char; 3] = ['r', 'w', 'x'];
+
+    pub fn from_metadata(metadata: &Metadata) -> Self {
+        Mode(metadata.mode() as u16)
     }
 
-    const CHARS: [char; 3] = ['r', 'w', 'x'];
+    pub fn set(&self, path: &Path) -> Result<()> {
+        fs::set_permissions(path, Permissions::from_mode(self.0 as u32))
+            .with_context(|| format!("Couldn't set mode of {} to {self}", path.pretty()))
+    }
 
     fn parse_char(index: usize, char: char) -> Result<bool, ParseModeError> {
         debug_assert!((0..9).contains(&index));
         Ok(match char {
-            '-' => false,
-            _ if char == Self::CHARS[index % 3] => true,
+            Self::OFF_CHAR => false,
+            _ if char == Self::ON_CHARS[index % 3] => true,
             _ => Err(ParseModeError::InvalidChar { char, index })?,
         })
+    }
+}
+
+impl Display for Mode {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let bits = self.0;
+        for i in 0..9 {
+            match ((bits >> (8 - i)) & 1) != 0 {
+                true => Mode::ON_CHARS[i % 3],
+                false => Mode::OFF_CHAR,
+            }
+            .fmt(f)?;
+        }
+        Ok(())
     }
 }
 
@@ -153,11 +172,32 @@ mod tests {
             ("w--------", Err(invalid_char('w', 0))),
             ("-x-------", Err(invalid_char('x', 1))),
         ];
-        for (s, result) in strings {
+        for (string, result) in strings {
             match result {
-                Ok(bits) => assert_eq!(Mode::from_str(&s).unwrap(), Mode::try_from(bits).unwrap()),
-                Err(err) => assert_eq!(Mode::from_str(&s), Err(err)),
+                Ok(bits) => assert_eq!(Mode::from_str(&string).unwrap(), Mode(bits)),
+                Err(err) => assert_eq!(Mode::from_str(&string), Err(err)),
             }
         }
+    }
+
+    #[test]
+    fn display() {
+        assert_eq!(Mode(0b000000000).to_string(), "---------");
+        assert_eq!(Mode(0b100000000).to_string(), "r--------");
+        assert_eq!(Mode(0b010000000).to_string(), "-w-------");
+        assert_eq!(Mode(0b001000000).to_string(), "--x------");
+        assert_eq!(Mode(0b000100000).to_string(), "---r-----");
+        assert_eq!(Mode(0b000010000).to_string(), "----w----");
+        assert_eq!(Mode(0b000001000).to_string(), "-----x---");
+        assert_eq!(Mode(0b000000100).to_string(), "------r--");
+        assert_eq!(Mode(0b000000010).to_string(), "-------w-");
+        assert_eq!(Mode(0b000000001).to_string(), "--------x");
+        assert_eq!(Mode(0b100100100).to_string(), "r--r--r--");
+        assert_eq!(Mode(0b010010010).to_string(), "-w--w--w-");
+        assert_eq!(Mode(0b001001001).to_string(), "--x--x--x");
+        assert_eq!(Mode(0b111000000).to_string(), "rwx------");
+        assert_eq!(Mode(0b000111000).to_string(), "---rwx---");
+        assert_eq!(Mode(0b000000111).to_string(), "------rwx");
+        assert_eq!(Mode(0b111111111).to_string(), "rwxrwxrwx");
     }
 }

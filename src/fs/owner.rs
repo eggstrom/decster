@@ -1,6 +1,7 @@
 use std::{
     fmt::{self, Display, Formatter},
-    os::unix,
+    fs::Metadata,
+    os::unix::{self, fs::MetadataExt},
     path::Path,
     str::FromStr,
 };
@@ -18,7 +19,7 @@ use crate::{
     utils::pretty::Pretty,
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct Owner {
     user: Option<String>,
     group: Option<Group>,
@@ -33,10 +34,6 @@ enum Group {
 impl Owner {
     fn new(user: Option<String>, group: Option<Group>) -> Self {
         Owner { user, group }
-    }
-
-    fn empty() -> Self {
-        Owner::new(None, None)
     }
 
     fn user(user: &str) -> Self {
@@ -83,7 +80,7 @@ impl FromStr for Owner {
         Ok(match s.split_once(':') {
             None if s.is_empty() => Err(ParseOwnerError)?,
             None => Owner::user(s),
-            Some(("", "")) => Owner::empty(),
+            Some(("", "")) => Owner::default(),
             Some((user, "")) => Owner::user_with_login_group(user),
             Some(("", group)) => Owner::group(group),
             Some((user, group)) => Owner::user_with_group(user, group),
@@ -124,15 +121,17 @@ pub struct OwnerIds {
 }
 
 impl OwnerIds {
-    pub fn change_owner(&self, path: &Path) -> Result<()> {
+    pub fn from_metadata(metadata: &Metadata) -> Self {
+        let (uid, gid) = (Some(metadata.uid()), Some(metadata.gid()));
+        OwnerIds { uid, gid }
+    }
+
+    pub fn set(&self, path: &Path) -> Result<()> {
         if self.uid.is_none() && self.gid.is_none() {
             return Ok(());
         }
-        let uid = self.uid.map_or("null".to_string(), |uid| uid.to_string());
-        let gid = self.gid.map_or("null".to_string(), |gid| gid.to_string());
-        println!("UID: {uid}, GID: {gid}");
         unix::fs::lchown(path, self.uid, self.gid)
-            .with_context(|| format!("Couldn't change owner of {}", env::tildefy(path).pretty()))
+            .with_context(|| format!("Couldn't set owner of {}", env::tildefy(path).pretty()))
     }
 }
 
@@ -143,7 +142,7 @@ mod tests {
     #[rustfmt::skip]
     #[test]
     pub fn parse() {
-        assert_eq!(Owner::from_str(":"), Ok(Owner::empty()));
+        assert_eq!(Owner::from_str(":"), Ok(Owner::default()));
         assert_eq!(Owner::from_str("user:"), Ok(Owner::user_with_login_group("user")));
         assert_eq!(Owner::from_str("user:group"), Ok(Owner::user_with_group("user", "group")));
         assert_eq!(Owner::from_str(":group"), Ok(Owner::group("group")));

@@ -80,7 +80,9 @@ impl<'a> ModuleLink<'a> {
             if state.is_path_owned(&new_path) {
                 bail!("Path is used by another module");
             } else if path.is_dir() {
-                self.create_dir(state, module, &new_path)?;
+                if self.create_dir(state, module, &new_path)? {
+                    self.set_or_copy_permissions(path, &new_path)?;
+                }
             } else {
                 let info = match self.kind {
                     LinkKind::File => Self::create_file(path, &new_path),
@@ -93,21 +95,22 @@ impl<'a> ModuleLink<'a> {
                     format!("Couldn't create {} ({})", new_path.pretty(), self.kind)
                 })?;
                 state.add_path(module, &new_path, info);
-                self.change_permissions(&new_path)?;
+                self.set_permissions(&new_path)?;
             }
             Ok(())
         })?;
         Ok(())
     }
 
-    fn create_dir(&self, state: &mut State, module: &str, path: &Path) -> Result<()> {
-        if !path.is_dir() {
+    fn create_dir(&self, state: &mut State, module: &str, path: &Path) -> Result<bool> {
+        Ok(if !path.is_dir() {
             fs::create_dir(path)
                 .with_context(|| format!("Couldn't create directory: {}", path.pretty()))?;
             state.add_path(module, path, PathInfo::Directory);
-            self.change_permissions(path)?;
-        }
-        Ok(())
+            true
+        } else {
+            false
+        })
     }
 
     fn create_path(&self, state: &mut State, module: &str, path: &Path) -> Result<()> {
@@ -115,7 +118,9 @@ impl<'a> ModuleLink<'a> {
         if let Some(parent) = path.parent() {
             for component in parent.components() {
                 components.push(component);
-                self.create_dir(state, module, &components)?;
+                if self.create_dir(state, module, &components)? {
+                    self.set_permissions(&components)?;
+                }
             }
         }
         Ok(())
@@ -154,13 +159,22 @@ impl<'a> ModuleLink<'a> {
         Ok(PathInfo::File { size, hash })
     }
 
-    fn change_permissions(&self, path: &Path) -> Result<()> {
+    fn set_permissions(&self, path: &Path) -> Result<()> {
         if let Some(owner) = &self.owner {
-            owner.change_owner(path)?;
+            owner.set(path)?;
         }
         if let Some(mode) = &self.mode {
-            mode.change_mode(path)?;
+            mode.set(path)?;
         }
+        Ok(())
+    }
+
+    fn set_or_copy_permissions(&self, from: &Path, to: &Path) -> Result<()> {
+        let md = from
+            .symlink_metadata()
+            .with_context(|| format!("Couldn't read metadata of {}", from.pretty()))?;
+        self.owner.unwrap_or(OwnerIds::from_metadata(&md)).set(to)?;
+        self.mode.unwrap_or(Mode::from_metadata(&md)).set(to)?;
         Ok(())
     }
 }
