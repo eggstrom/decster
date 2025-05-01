@@ -93,18 +93,6 @@ pub fn fetch() -> bool {
     config().behavior.fetch
 }
 
-pub fn overwrite() -> bool {
-    config().behavior.overwrite
-}
-
-pub fn dry_run() -> bool {
-    config().behavior.dry_run
-}
-
-pub fn quiet() -> bool {
-    config().behavior.quiet
-}
-
 pub fn has_static_source(name: &SourceName) -> bool {
     config().static_sources.contains(name)
 }

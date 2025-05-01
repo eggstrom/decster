@@ -18,15 +18,6 @@ pub struct Behavior {
     /// Re-fetch sources
     #[arg(long, short, global = true)]
     pub fetch: bool,
-    /// Overwrite existing files
-    #[arg(long, short, global = true)]
-    pub overwrite: bool,
-    /// Show changes without doing anything
-    #[arg(long, short, global = true)]
-    pub dry_run: bool,
-    /// Surpress output
-    #[arg(long, short, global = true)]
-    pub quiet: bool,
 }
 
 #[derive(Clone, Debug, Subcommand)]
