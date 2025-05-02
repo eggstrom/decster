@@ -1,11 +1,17 @@
-use std::{fmt::Display, path::Path};
+use std::{
+    fmt::Display,
+    io,
+    os::unix::process::CommandExt,
+    path::Path,
+    process::{self, Command},
+};
 
 use anyhow::{Result, bail};
 use clap::Parser;
 use crossterm::style::Stylize;
 
 use crate::{
-    cli::{Cli, Command},
+    cli::{Cli, CliCommand},
     config,
     env::Env,
     globs::Globs,
@@ -28,12 +34,13 @@ impl App {
         let mut app = App { env, state };
 
         match cli.command {
-            Command::Enable { modules } => app.enable(&modules)?,
-            Command::Disable { modules } => app.disable(&modules)?,
-            Command::Update { modules } => app.update(&modules)?,
-            Command::List => app.list(),
-            Command::Paths => app.paths()?,
-            Command::Hash { sources } => app.hash(&sources)?,
+            CliCommand::Enable { modules } => app.enable(&modules)?,
+            CliCommand::Disable { modules } => app.disable(&modules)?,
+            CliCommand::Update { modules } => app.update(&modules)?,
+            CliCommand::List => app.list(),
+            CliCommand::Paths => app.paths()?,
+            CliCommand::Hash { sources } => app.hash(&sources)?,
+            CliCommand::Git { args } => app.git(&args),
         }
         Ok(())
     }
@@ -76,14 +83,14 @@ impl App {
 
     fn update(&mut self, modules: &[String]) -> Result<()> {
         if modules.is_empty() {
-            match self.update_inner(self.state.modules()) {
+            match self.update_inner(&self.state.modules()) {
                 Ok(false) => bail!("There are no enabled modules"),
                 Err(err) => eprintln!("{} {err:?}", "error:".red()),
                 _ => (),
             }
         } else {
             let globs = Globs::permissive(modules)?;
-            match self.update_inner(self.state.modules_matching_globs(&globs)) {
+            match self.update_inner(&self.state.modules_matching_globs(&globs)) {
                 Ok(false) => {
                     bail!("{} didn't match any enabled modules", modules.pretty());
                 }
@@ -94,11 +101,7 @@ impl App {
         self.state.save(&self.env)
     }
 
-    fn update_inner<I>(&mut self, modules: I) -> Result<bool>
-    where
-        I: IntoIterator,
-        I::Item: AsRef<str>,
-    {
+    fn update_inner(&mut self, modules: &[String]) -> Result<bool> {
         let mut has_updated = false;
         for name in modules {
             has_updated = true;
@@ -180,6 +183,19 @@ impl App {
         match Sha256Hash::from_path(path) {
             Ok(hash) => println!("{hash}"),
             Err(err) => println!("{} {err:?}", "error:".red()),
+        }
+    }
+
+    fn git(&self, args: &[String]) {
+        if let Some(err) = Command::new("git")
+            .args(args)
+            .current_dir(self.env.config_dir())
+            .stdout(io::stdout())
+            .stderr(io::stderr())
+            .exec()
+            .raw_os_error()
+        {
+            process::exit(err);
         }
     }
 }

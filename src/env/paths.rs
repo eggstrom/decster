@@ -7,6 +7,7 @@ use anyhow::{Result, anyhow};
 
 pub struct Paths {
     home_dir: PathBuf,
+    config_dir: PathBuf,
     config_file: PathBuf,
     module_dir: PathBuf,
     static_source_dir: PathBuf,
@@ -42,6 +43,7 @@ impl Paths {
 
         Ok(Paths {
             home_dir,
+            config_dir,
             config_file,
             module_dir,
             static_source_dir,
@@ -54,6 +56,10 @@ impl Paths {
 
     pub fn home_dir(&self) -> &Path {
         &self.home_dir
+    }
+
+    pub fn config_dir(&self) -> &Path {
+        &self.config_dir
     }
 
     pub fn config_file(&self) -> &Path {

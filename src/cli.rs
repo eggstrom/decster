@@ -7,7 +7,7 @@ pub struct Cli {
     #[group(flatten)]
     pub behavior: Behavior,
     #[command(subcommand)]
-    pub command: Command,
+    pub command: CliCommand,
     /// Set path to config directory
     #[arg(long, short, value_name = "PATH", global = true)]
     pub config: Option<PathBuf>,
@@ -21,7 +21,7 @@ pub struct Behavior {
 }
 
 #[derive(Clone, Debug, Subcommand)]
-pub enum Command {
+pub enum CliCommand {
     #[command()]
     /// Enable modules
     Enable {
@@ -46,4 +46,10 @@ pub enum Command {
     /// Show hashes of fetched sources
     #[command()]
     Hash { sources: Vec<String> },
+    /// Run Git commands in config directory
+    #[command()]
+    Git {
+        #[arg(allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
 }
