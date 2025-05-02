@@ -9,8 +9,7 @@ use indexmap::IndexMap;
 use toml::Value;
 
 use crate::{
-    fs::{mode::Mode, owner::OwnerIds},
-    state::State,
+    env::Env, fs::{mode::Mode, owner::OwnerIds}, state::State
 };
 
 use super::{
@@ -24,10 +23,10 @@ pub struct ModuleSet<'a> {
 }
 
 impl<'a> ModuleSet<'a> {
-    pub fn links(&self) -> Result<impl ExactSizeIterator<Item = ModuleLink>> {
+    pub fn links(&self, env: &Env) -> Result<impl ExactSizeIterator<Item = ModuleLink>> {
         let mut links = BTreeSet::new();
         for (_, module) in self.modules.iter() {
-            let o = module.owner.as_ref().map(|owner| owner.ids()).transpose()?;
+            let o = module.owner.as_ref().map(|o| o.ids(env)).transpose()?;
             let m = module.mode;
             Self::links_inner(o, m, &module.files, &mut links, LinkKind::File)?;
             Self::links_inner(o, m, &module.hard_links, &mut links, LinkKind::HardLink)?;
@@ -67,10 +66,10 @@ impl<'a> ModuleSet<'a> {
         Ok(context)
     }
 
-    pub fn enable(&self, state: &mut State, name: &str) -> Result<()> {
+    pub fn enable(&self, env: &Env, state: &mut State, name: &str) -> Result<()> {
         state.add_module(name);
-        for link in self.links()? {
-            link.create(state, name, &self.context()?)
+        for link in self.links(env)? {
+            link.create(env, state, name, &self.context()?)
                 .with_context(|| format!("Couldn't create link: {link}"))?
         }
         Ok(())

@@ -14,9 +14,7 @@ use serde::{
 use thiserror::Error;
 
 use crate::{
-    global::env,
-    user::{self, User},
-    utils::pretty::Pretty,
+    env::Env, user::{self, User}, utils::pretty::Pretty
 };
 
 #[derive(Debug, Default, PartialEq)]
@@ -52,16 +50,16 @@ impl Owner {
         Owner::new(None, Some(Group::Name(group.to_string())))
     }
 
-    pub fn ids(&self) -> Result<OwnerIds> {
+    pub fn ids(&self, env: &Env) -> Result<OwnerIds> {
         let user = self
             .user
             .as_ref()
             .map(|name| User::new(name))
             .transpose()?
-            .filter(|user| !user.is_current());
+            .filter(|user| !user.is_current(env));
         let uid = user.as_ref().map(|user| user.gid);
         let gid = match &self.group {
-            Some(Group::Name(name)) => Some(user::gid(name)?).filter(|gid| *gid != env::gid()),
+            Some(Group::Name(name)) => Some(user::gid(name)?).filter(|gid| *gid != env.gid()),
             Some(Group::LoginGroup) => user.as_ref().map(|user| user.gid),
             None => None,
         };
@@ -126,12 +124,12 @@ impl OwnerIds {
         OwnerIds { uid, gid }
     }
 
-    pub fn set(&self, path: &Path) -> Result<()> {
+    pub fn set(&self, env: &Env, path: &Path) -> Result<()> {
         if self.uid.is_none() && self.gid.is_none() {
             return Ok(());
         }
         unix::fs::lchown(path, self.uid, self.gid)
-            .with_context(|| format!("Couldn't set owner of {}", env::tildefy(path).pretty()))
+            .with_context(|| format!("Couldn't set owner of {}", env.tildefy(path).pretty()))
     }
 }
 

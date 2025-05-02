@@ -4,7 +4,7 @@ use anyhow::{Context, Result, bail};
 use bincode::{Decode, Encode};
 use serde::Deserialize;
 
-use crate::utils::sha256::Sha256Hash;
+use crate::{env::Env, utils::sha256::Sha256Hash};
 
 use super::Source;
 
@@ -17,8 +17,8 @@ pub struct HashableSource {
 }
 
 impl HashableSource {
-    pub fn fetch(&self, path: &Path) -> Result<()> {
-        self.source.fetch(path)?;
+    pub fn fetch(&self, env: &Env, path: &Path) -> Result<()> {
+        self.source.fetch(env, path)?;
         self.check(path)?;
         Ok(())
     }

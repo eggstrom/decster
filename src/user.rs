@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::{Result, anyhow};
 use nix::unistd::{self, Group};
 
-use crate::global::env::{self};
+use crate::env::Env;
 
 #[derive(Eq, Ord, PartialEq, PartialOrd)]
 pub struct User {
@@ -23,8 +23,8 @@ impl User {
             .ok_or(anyhow!("User doesn't exist"))
     }
 
-    pub fn is_current(&self) -> bool {
-        self.uid == env::uid()
+    pub fn is_current(&self, env: &Env) -> bool {
+        self.uid == env.uid()
     }
 }
 

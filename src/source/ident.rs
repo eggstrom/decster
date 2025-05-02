@@ -7,10 +7,7 @@ use bincode::{Decode, Encode};
 use crossterm::style::Stylize;
 use sha2::{Digest, Sha256};
 
-use crate::{
-    global::env,
-    utils::{pretty::Pretty, sha256::Sha256Hash},
-};
+use crate::{env::Env, utils::{pretty::Pretty, sha256::Sha256Hash}};
 
 use super::name::SourceName;
 
@@ -42,10 +39,10 @@ impl SourceIdent {
         }
     }
 
-    pub fn path(&self) -> PathBuf {
+    pub fn path(&self, env: &Env) -> PathBuf {
         match self {
-            SourceIdent::Named(name) => env::named_sources().join(name),
-            SourceIdent::Unnamed { module, path } => env::unnamed_sources().join({
+            SourceIdent::Named(name) => env.named_sources().join(name),
+            SourceIdent::Unnamed { module, path } => env.unnamed_sources().join({
                 let mut hasher = Sha256::new();
                 hasher.update(module);
                 hasher.update(path.to_string_lossy().as_ref());

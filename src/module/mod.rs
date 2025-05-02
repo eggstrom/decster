@@ -12,8 +12,8 @@ use source::ModuleSource;
 use toml::Value;
 
 use crate::{
+    config,
     fs::{mode::Mode, owner::Owner},
-    global::config,
     globs::Globs,
 };
 

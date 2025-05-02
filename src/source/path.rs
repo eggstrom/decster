@@ -12,7 +12,7 @@ use serde::{
 };
 use thiserror::Error;
 
-use crate::utils::pretty::Pretty;
+use crate::{env::Env, utils::pretty::Pretty};
 
 use super::name::{ParseSourceNameError, SourceName};
 
@@ -23,16 +23,16 @@ pub struct SourcePath {
 }
 
 impl SourcePath {
-    pub fn static_path(&self) -> PathBuf {
-        let mut full_path = self.name.static_path();
+    pub fn static_path(&self, env: &Env) -> PathBuf {
+        let mut full_path = self.name.static_path(env);
         if let Some(path) = &self.path {
             full_path.push(path);
         }
         full_path
     }
 
-    pub fn named_path(&self) -> PathBuf {
-        let mut full_path = self.name.named_path();
+    pub fn named_path(&self, env: &Env) -> PathBuf {
+        let mut full_path = self.name.named_path(env);
         if let Some(path) = &self.path {
             full_path.push(path);
         }

@@ -7,18 +7,18 @@ use std::{
 use anyhow::{Result, anyhow};
 use nix::unistd;
 
-pub(super) struct Env {
-    pub uid: u32,
-    pub gid: u32,
+pub struct Env {
+    uid: u32,
+    gid: u32,
 
-    pub home: PathBuf,
-    pub config: PathBuf,
-    pub modules: PathBuf,
-    pub static_sources: PathBuf,
-    pub dynamic_sources: PathBuf,
-    pub named_sources: PathBuf,
-    pub unnamed_sources: PathBuf,
-    pub state: PathBuf,
+    home: PathBuf,
+    config: PathBuf,
+    modules: PathBuf,
+    static_sources: PathBuf,
+    dynamic_sources: PathBuf,
+    named_sources: PathBuf,
+    unnamed_sources: PathBuf,
+    state: PathBuf,
 }
 
 impl Env {
@@ -53,65 +53,69 @@ impl Env {
             state: data.join("state"),
         })
     }
-}
 
-fn env() -> &'static Env {
-    &super::state().env
-}
-
-pub fn uid() -> u32 {
-    env().uid
-}
-
-pub fn gid() -> u32 {
-    env().gid
-}
-
-pub fn home() -> &'static Path {
-    &env().home
-}
-
-pub fn static_sources() -> &'static Path {
-    &env().static_sources
-}
-
-pub fn named_sources() -> &'static Path {
-    &env().named_sources
-}
-
-pub fn unnamed_sources() -> &'static Path {
-    &env().unnamed_sources
-}
-
-pub fn state() -> &'static Path {
-    &env().state
-}
-
-const TILDE: &str = "~";
-
-pub fn tildefy_with<'a>(path: &'a Path, home: &Path) -> Cow<'a, Path> {
-    match path.strip_prefix(home) {
-        Ok(path) => match path.parent() {
-            None => Cow::Borrowed(Path::new(TILDE)),
-            Some(_) => Cow::Owned(Path::new(TILDE).join(path)),
-        },
-        Err(_) => Cow::Borrowed(path),
+    pub fn uid(&self) -> u32 {
+        self.uid
     }
-}
 
-pub fn untildefy_with<'a>(path: &'a Path, home: &Path) -> Cow<'a, Path> {
-    match path.strip_prefix(TILDE) {
-        Ok(path) => Cow::Owned(home.join(path)),
-        Err(_) => Cow::Borrowed(path),
+    pub fn gid(&self) -> u32 {
+        self.gid
     }
-}
 
-pub fn tildefy(path: &Path) -> Cow<Path> {
-    tildefy_with(path, home())
-}
+    pub fn config(&self) -> &Path {
+        &self.config
+    }
 
-pub fn untildefy(path: &Path) -> Cow<Path> {
-    untildefy_with(path, home())
+    pub fn modules(&self) -> &Path {
+        &self.modules
+    }
+
+    pub fn static_sources(&self) -> &Path {
+        &self.static_sources
+    }
+
+    pub fn dynamic_sources(&self) -> &Path {
+        &self.dynamic_sources
+    }
+
+    pub fn named_sources(&self) -> &Path {
+        &self.named_sources
+    }
+
+    pub fn unnamed_sources(&self) -> &Path {
+        &self.unnamed_sources
+    }
+
+    pub fn state(&self) -> &Path {
+        &self.state
+    }
+
+    const TILDE: &str = "~";
+
+    pub fn tildefy_with<'a>(path: &'a Path, home: &Path) -> Cow<'a, Path> {
+        match path.strip_prefix(home) {
+            Ok(path) => match path.parent() {
+                None => Cow::Borrowed(Path::new(Self::TILDE)),
+                Some(_) => Cow::Owned(Path::new(Self::TILDE).join(path)),
+            },
+            Err(_) => Cow::Borrowed(path),
+        }
+    }
+
+    pub fn untildefy_with<'a>(path: &'a Path, home: &Path) -> Cow<'a, Path> {
+        match path.strip_prefix(Self::TILDE) {
+            Ok(path) => Cow::Owned(home.join(path)),
+            Err(_) => Cow::Borrowed(path),
+        }
+    }
+
+    pub fn tildefy<'a>(&self, path: &'a Path) -> Cow<'a, Path> {
+        Self::tildefy_with(path, &self.home)
+    }
+
+    pub fn untildefy<'a>(&self, path: &'a Path) -> Cow<'a, Path> {
+        Self::untildefy_with(path, &self.home)
+    }
 }
 
 #[cfg(test)]
@@ -136,7 +140,7 @@ mod tests {
     fn tildefy() {
         let home = dirs::home_dir().unwrap();
         for (tilde, untilde) in paths(&home) {
-            assert_eq!(tildefy_with(&untilde, &home), tilde);
+            assert_eq!(Env::tildefy_with(&untilde, &home), tilde);
         }
     }
 
@@ -144,7 +148,7 @@ mod tests {
     fn untildefy() {
         let home = dirs::home_dir().unwrap();
         for (tilde, no_tilde) in paths(&home) {
-            assert_eq!(untildefy_with(tilde, &home), no_tilde);
+            assert_eq!(Env::untildefy_with(tilde, &home), no_tilde);
         }
     }
 }

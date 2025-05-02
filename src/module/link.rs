@@ -13,11 +13,7 @@ use derive_more::Display;
 use toml::Value;
 
 use crate::{
-    fs::{mode::Mode, owner::OwnerIds},
-    global::env,
-    state::{State, path::PathInfo},
-    upon,
-    utils::{pretty::Pretty, sha256::Sha256Hash},
+    env::Env, fs::{mode::Mode, owner::OwnerIds}, state::{path::PathInfo, State}, upon, utils::{pretty::Pretty, sha256::Sha256Hash}
 };
 
 use super::source::ModuleSource;
@@ -63,13 +59,14 @@ impl<'a> ModuleLink<'a> {
 
     pub fn create(
         &self,
+        env: &Env,
         state: &mut State,
         module: &str,
         context: &HashMap<&str, &Value>,
     ) -> Result<()> {
-        let source_path = self.source.fetch(state, module, self.path)?;
-        let link_path = env::untildefy(self.path);
-        self.create_path(state, module, &link_path)?;
+        let source_path = self.source.fetch(env, state, module, self.path)?;
+        let link_path = env.untildefy(self.path);
+        self.create_path(env, state, module, &link_path)?;
 
         crate::fs::walk_dir_rel(source_path, false, false, |path, rel_path| {
             let mut new_path = Cow::Borrowed(link_path.as_ref());
@@ -81,7 +78,7 @@ impl<'a> ModuleLink<'a> {
                 bail!("Path is used by another module");
             } else if path.is_dir() {
                 if self.create_dir(state, module, &new_path)? {
-                    self.set_or_copy_permissions(path, &new_path)?;
+                    self.set_or_copy_permissions(env, path, &new_path)?;
                 }
             } else {
                 let info = match self.kind {
@@ -91,11 +88,11 @@ impl<'a> ModuleLink<'a> {
                     LinkKind::Template => Self::create_template(path, &new_path, context),
                 }
                 .with_context(|| {
-                    let new_path = env::tildefy(new_path.as_ref());
+                    let new_path = env.tildefy(new_path.as_ref());
                     format!("Couldn't create {} ({})", new_path.pretty(), self.kind)
                 })?;
                 state.add_path(module, &new_path, info);
-                self.set_permissions(&new_path)?;
+                self.set_permissions(env, &new_path)?;
             }
             Ok(())
         })?;
@@ -113,13 +110,13 @@ impl<'a> ModuleLink<'a> {
         })
     }
 
-    fn create_path(&self, state: &mut State, module: &str, path: &Path) -> Result<()> {
+    fn create_path(&self, env: &Env, state: &mut State, module: &str, path: &Path) -> Result<()> {
         let mut components = PathBuf::from("");
         if let Some(parent) = path.parent() {
             for component in parent.components() {
                 components.push(component);
                 if self.create_dir(state, module, &components)? {
-                    self.set_permissions(&components)?;
+                    self.set_permissions(env, &components)?;
                 }
             }
         }
@@ -159,22 +156,24 @@ impl<'a> ModuleLink<'a> {
         Ok(PathInfo::File { size, hash })
     }
 
-    fn set_permissions(&self, path: &Path) -> Result<()> {
+    fn set_permissions(&self, env: &Env, path: &Path) -> Result<()> {
         if let Some(owner) = &self.owner {
-            owner.set(path)?;
+            owner.set(env, path)?;
         }
         if let Some(mode) = &self.mode {
-            mode.set(path)?;
+            mode.set(env, path)?;
         }
         Ok(())
     }
 
-    fn set_or_copy_permissions(&self, from: &Path, to: &Path) -> Result<()> {
+    fn set_or_copy_permissions(&self, env: &Env, from: &Path, to: &Path) -> Result<()> {
         let md = from
             .symlink_metadata()
             .with_context(|| format!("Couldn't read metadata of {}", from.pretty()))?;
-        self.owner.unwrap_or(OwnerIds::from_metadata(&md)).set(to)?;
-        self.mode.unwrap_or(Mode::from_metadata(&md)).set(to)?;
+        self.owner
+            .unwrap_or(OwnerIds::from_metadata(&md))
+            .set(env, to)?;
+        self.mode.unwrap_or(Mode::from_metadata(&md)).set(env, to)?;
         Ok(())
     }
 }

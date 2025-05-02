@@ -13,7 +13,7 @@ use serde::{
 };
 use thiserror::Error;
 
-use crate::utils::pretty::Pretty;
+use crate::{env::Env, utils::pretty::Pretty};
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Mode(u16);
@@ -26,9 +26,13 @@ impl Mode {
         Mode(metadata.mode() as u16)
     }
 
-    pub fn set(&self, path: &Path) -> Result<()> {
-        fs::set_permissions(path, Permissions::from_mode(self.0 as u32))
-            .with_context(|| format!("Couldn't set mode of {} to {self}", path.pretty()))
+    pub fn set(&self, env: &Env, path: &Path) -> Result<()> {
+        fs::set_permissions(path, Permissions::from_mode(self.0 as u32)).with_context(|| {
+            format!(
+                "Couldn't set mode of {} to {self}",
+                env.tildefy(path).pretty()
+            )
+        })
     }
 
     fn parse_char(index: usize, char: char) -> Result<bool, ParseModeError> {

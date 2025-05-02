@@ -10,11 +10,7 @@ use crossterm::style::Stylize;
 use path::PathInfo;
 
 use crate::{
-    global::env,
-    globs::Globs,
-    module::set::ModuleSet,
-    source::{hashable::HashableSource, ident::SourceIdent},
-    utils::pretty::Pretty,
+    env::Env, globs::Globs, module::set::ModuleSet, source::{hashable::HashableSource, ident::SourceIdent}, utils::pretty::Pretty
 };
 
 pub mod path;
@@ -27,18 +23,18 @@ pub struct State {
 }
 
 impl State {
-    pub fn load() -> Result<Self> {
-        let dir = env::named_sources();
+    pub fn load(env: &Env) -> Result<Self> {
+        let dir = env.named_sources();
         fs::create_dir_all(dir)
-            .with_context(|| format!("Couldn't create path: {}", env::tildefy(dir).pretty()))?;
-        Ok(File::open(env::state())
+            .with_context(|| format!("Couldn't create path: {}", env.tildefy(dir).pretty()))?;
+        Ok(File::open(env.state())
             .ok()
             .and_then(|mut file| bincode::decode_from_std_read(&mut file, Self::bin_config()).ok())
             .unwrap_or_default())
     }
 
-    pub fn save(&self) -> Result<()> {
-        let mut file = File::create(env::state())?;
+    pub fn save(&self, env: &Env) -> Result<()> {
+        let mut file = File::create(env.state())?;
         bincode::encode_into_std_write(self, &mut file, Self::bin_config())?;
         Ok(())
     }
@@ -56,10 +52,15 @@ impl State {
             .filter(move |ident| ident.is_named_and(|name| globs.is_match(name)))
     }
 
-    pub fn is_source_fetched(&self, ident: &SourceIdent, source: &HashableSource) -> bool {
+    pub fn is_source_fetched(
+        &self,
+        env: &Env,
+        ident: &SourceIdent,
+        source: &HashableSource,
+    ) -> bool {
         self.sources
             .get(ident)
-            .is_some_and(|s| s == source && source.check(&ident.path()).is_ok())
+            .is_some_and(|s| s == source && source.check(&ident.path(env)).is_ok())
     }
 
     pub fn is_module_enabled(&self, module: &str) -> bool {
@@ -111,12 +112,12 @@ impl State {
             .collect()
     }
 
-    pub fn enable_module(&mut self, name: &str, modules: ModuleSet) -> Result<()> {
+    pub fn enable_module(&mut self, env: &Env, name: &str, modules: ModuleSet) -> Result<()> {
         if let Err(err) = modules
-            .enable(self, name)
+            .enable(env, self, name)
             .with_context(|| format!("Couldn't enable module {}", name.magenta()))
         {
-            if let Err(err) = self.disable_module(name) {
+            if let Err(err) = self.disable_module(env, name) {
                 eprintln!("{} {err:?}", "error:".red());
             }
             bail!(err);
@@ -124,7 +125,7 @@ impl State {
         Ok(())
     }
 
-    pub fn disable_module(&mut self, module: &str) -> Result<()> {
+    pub fn disable_module(&mut self, env: &Env, module: &str) -> Result<()> {
         let paths = self
             .module_paths
             .get_mut(module)
@@ -133,7 +134,7 @@ impl State {
         // removed last.
         for i in (0..paths.len()).rev() {
             let (path, info) = &paths[i];
-            info.remove_if_owned(path)?;
+            info.remove_if_owned(env, path)?;
             self.paths.remove(path);
             paths.remove(i);
         }
@@ -141,10 +142,15 @@ impl State {
         Ok(())
     }
 
-    pub fn update_module(&mut self, name: &str, modules: Option<ModuleSet>) -> Result<()> {
-        self.disable_module(name)?;
+    pub fn update_module(
+        &mut self,
+        env: &Env,
+        name: &str,
+        modules: Option<ModuleSet>,
+    ) -> Result<()> {
+        self.disable_module(env, name)?;
         if let Some(modules) = modules {
-            self.enable_module(name, modules)?;
+            self.enable_module(env, name, modules)?;
         }
         Ok(())
     }

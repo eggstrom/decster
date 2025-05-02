@@ -2,6 +2,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     path::Path,
+    sync::OnceLock,
 };
 
 use anyhow::{Context, Result};
@@ -33,11 +34,11 @@ pub(super) struct Config {
 
 impl Config {
     pub fn load(env: &Env, behavior: Behavior) -> Result<Self> {
-        let mut config = Config::parse(&env.config)?;
+        let mut config = Config::parse(&env.config())?;
         config.behavior = behavior;
-        config.load_modules(&env.modules)?;
-        config.load_static_sources(&env.static_sources)?;
-        config.load_dynamic_sources(&env.dynamic_sources)?;
+        config.load_modules(&env.modules())?;
+        config.load_static_sources(&env.static_sources())?;
+        config.load_dynamic_sources(&env.dynamic_sources())?;
         Ok(config)
     }
 
@@ -85,8 +86,20 @@ impl Config {
     }
 }
 
+static CONFIG: OnceLock<Config> = OnceLock::new();
+
+pub fn load(env: &Env, behavior: Behavior) -> Result<()> {
+    CONFIG
+        .set(Config::load(env, behavior)?)
+        .ok()
+        .expect("`config::load` should only be called once");
+    Ok(())
+}
+
 fn config() -> &'static Config {
-    &super::state().config
+    CONFIG
+        .get()
+        .expect("`config::load` should be called without failing before config is read")
 }
 
 pub fn fetch() -> bool {

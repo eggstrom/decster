@@ -6,7 +6,8 @@ use crossterm::style::Stylize;
 
 use crate::{
     cli::{Cli, Command},
-    global::{self, config, env},
+    config,
+    env::Env,
     globs::Globs,
     source::{ident::SourceIdent, name::SourceName},
     state::State,
@@ -14,15 +15,17 @@ use crate::{
 };
 
 pub struct App {
+    env: Env,
     state: State,
 }
 
 impl App {
     pub fn run() -> Result<()> {
         let cli = Cli::parse();
-        global::load(cli.config, cli.behavior)?;
-        let state = State::load()?;
-        let mut app = App { state };
+        let env = Env::load(cli.config)?;
+        config::load(&env, cli.behavior)?;
+        let state = State::load(&env)?;
+        let mut app = App { env, state };
 
         match cli.command {
             Command::Enable { modules } => app.enable(&modules)?,
@@ -42,7 +45,7 @@ impl App {
             let modules = module.import(name)?;
             if !self.state.is_module_enabled(name) {
                 has_enabled = true;
-                if let Err(err) = self.state.enable_module(name, modules) {
+                if let Err(err) = self.state.enable_module(&self.env, name, modules) {
                     eprintln!("{} {err:?}", "error:".red());
                 } else {
                     println!("Enabled {}", name.magenta());
@@ -52,7 +55,7 @@ impl App {
         if !has_enabled {
             bail!("{} didn't match any disabled modules", modules.pretty());
         }
-        self.state.save()
+        self.state.save(&self.env)
     }
 
     fn disable(&mut self, modules: &[String]) -> Result<()> {
@@ -62,13 +65,13 @@ impl App {
             bail!("{} didn't match any enabled modules", modules.pretty());
         }
         for module in matches {
-            if let Err(err) = self.state.disable_module(&module) {
+            if let Err(err) = self.state.disable_module(&self.env, &module) {
                 eprintln!("{} {err:?}", "error:".red());
             } else {
                 println!("Disabled {}", module.magenta());
             }
         }
-        self.state.save()
+        self.state.save(&self.env)
     }
 
     fn update(&mut self, modules: &[String]) -> Result<()> {
@@ -88,7 +91,7 @@ impl App {
                 _ => (),
             }
         }
-        self.state.save()
+        self.state.save(&self.env)
     }
 
     fn update_inner<I>(&mut self, modules: I) -> Result<bool>
@@ -101,7 +104,8 @@ impl App {
             has_updated = true;
             let name = name.as_ref();
             let modules = config::module(name).map(|(_, module)| module.import(name));
-            self.state.update_module(name, modules.transpose()?)?;
+            self.state
+                .update_module(&self.env, name, modules.transpose()?)?;
             println!("Updated {}", name.magenta());
         }
         Ok(has_updated)
@@ -126,7 +130,7 @@ impl App {
         for (module, paths) in self.state.owned_paths() {
             println!("Paths owned by module {}:", module.magenta());
             for (path, info) in paths {
-                println!("  {} ({})", env::tildefy(path).pretty(), info.kind());
+                println!("  {} ({})", self.env.tildefy(path).pretty(), info.kind());
             }
         }
         Ok(())
@@ -134,12 +138,12 @@ impl App {
 
     fn hash(&self, sources: &[String]) -> Result<()> {
         if sources.is_empty() {
-            if !Self::hash_inner(config::static_sources(), self.state.sources()) {
+            if !self.hash_inner(config::static_sources(), self.state.sources()) {
                 bail!("There are no fetched sources");
             }
         } else {
             let globs = Globs::permissive(sources)?;
-            if !Self::hash_inner(
+            if !self.hash_inner(
                 config::static_sources_matching_globs(&globs),
                 self.state.sources_matching_globs(&globs),
             ) {
@@ -149,7 +153,7 @@ impl App {
         Ok(())
     }
 
-    fn hash_inner<'a, 'b, S, D>(static_sources: S, dynamic_sources: D) -> bool
+    fn hash_inner<'a, 'b, S, D>(&self, static_sources: S, dynamic_sources: D) -> bool
     where
         S: Iterator<Item = &'a SourceName>,
         D: Iterator<Item = &'b SourceIdent>,
@@ -157,12 +161,12 @@ impl App {
         let mut has_sources = false;
         for source in static_sources {
             print!("({}) ", "Static".blue());
-            Self::print_source_hash(source, &env::static_sources().join(source));
+            Self::print_source_hash(source, &self.env.static_sources().join(source));
             has_sources = true;
         }
         for source in dynamic_sources {
             print!("({}) ", "Dynamic".blue());
-            Self::print_source_hash(source, &source.path());
+            Self::print_source_hash(source, &source.path(&self.env));
             has_sources = true;
         }
         has_sources
