@@ -14,7 +14,9 @@ use serde::{
 use thiserror::Error;
 
 use crate::{
-    env::Env, user::{self, User}, utils::pretty::Pretty
+    env::Env,
+    user::{self, User},
+    utils::pretty::Pretty,
 };
 
 #[derive(Debug, Default, PartialEq)]
@@ -59,7 +61,9 @@ impl Owner {
             .filter(|user| !user.is_current(env));
         let uid = user.as_ref().map(|user| user.gid);
         let gid = match &self.group {
-            Some(Group::Name(name)) => Some(user::gid(name)?).filter(|gid| *gid != env.gid()),
+            Some(Group::Name(name)) => {
+                Some(user::gid(name)?).filter(|gid| env.is_current_gid(*gid))
+            }
             Some(Group::LoginGroup) => user.as_ref().map(|user| user.gid),
             None => None,
         };

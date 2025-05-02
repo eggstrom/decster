@@ -24,7 +24,7 @@ impl User {
     }
 
     pub fn is_current(&self, env: &Env) -> bool {
-        self.uid == env.uid()
+        env.is_current_uid(self.uid)
     }
 }
 
