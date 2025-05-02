@@ -9,7 +9,9 @@ use indexmap::IndexMap;
 use toml::Value;
 
 use crate::{
-    env::Env, fs::{mode::Mode, owner::OwnerIds}, state::State
+    env::Env,
+    fs::{mode::Mode, owner::OwnerIds},
+    state::State,
 };
 
 use super::{
@@ -23,7 +25,10 @@ pub struct ModuleSet<'a> {
 }
 
 impl<'a> ModuleSet<'a> {
-    pub fn links(&self, env: &Env) -> Result<impl ExactSizeIterator<Item = ModuleLink>> {
+    pub fn links(
+        &self,
+        env: &mut Env,
+    ) -> Result<impl ExactSizeIterator<Item = ModuleLink> + use<'_>> {
         let mut links = BTreeSet::new();
         for (_, module) in self.modules.iter() {
             let o = module.owner.as_ref().map(|o| o.ids(env)).transpose()?;
@@ -66,7 +71,7 @@ impl<'a> ModuleSet<'a> {
         Ok(context)
     }
 
-    pub fn enable(&self, env: &Env, state: &mut State, name: &str) -> Result<()> {
+    pub fn enable(&self, env: &mut Env, state: &mut State, name: &str) -> Result<()> {
         state.add_module(name);
         for link in self.links(env)? {
             link.create(env, state, name, &self.context()?)

@@ -20,7 +20,7 @@ use super::env::Env;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub(super) struct Config {
+pub struct Config {
     #[serde(skip)]
     behavior: Behavior,
 

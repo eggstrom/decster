@@ -13,11 +13,7 @@ use serde::{
 };
 use thiserror::Error;
 
-use crate::{
-    env::Env,
-    user::{self, User},
-    utils::pretty::Pretty,
-};
+use crate::{env::Env, utils::pretty::Pretty};
 
 #[derive(Debug, Default, PartialEq)]
 pub struct Owner {
@@ -52,18 +48,15 @@ impl Owner {
         Owner::new(None, Some(Group::Name(group.to_string())))
     }
 
-    pub fn ids(&self, env: &Env) -> Result<OwnerIds> {
+    pub fn ids(&self, env: &mut Env) -> Result<OwnerIds> {
         let user = self
             .user
             .as_ref()
-            .map(|name| User::new(name))
-            .transpose()?
-            .filter(|user| !user.is_current(env));
-        let uid = user.as_ref().map(|user| user.gid);
+            .and_then(|name| env.other_user(name).transpose())
+            .transpose()?;
+        let uid = user.as_ref().map(|user| user.uid);
         let gid = match &self.group {
-            Some(Group::Name(name)) => {
-                Some(user::gid(name)?).filter(|gid| env.is_current_gid(*gid))
-            }
+            Some(Group::Name(name)) => env.other_group(name)?,
             Some(Group::LoginGroup) => user.as_ref().map(|user| user.gid),
             None => None,
         };

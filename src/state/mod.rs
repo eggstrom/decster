@@ -10,7 +10,11 @@ use crossterm::style::Stylize;
 use path::PathInfo;
 
 use crate::{
-    env::Env, globs::Globs, module::set::ModuleSet, source::{hashable::HashableSource, ident::SourceIdent}, utils::pretty::Pretty
+    env::Env,
+    globs::Globs,
+    module::set::ModuleSet,
+    source::{hashable::HashableSource, ident::SourceIdent},
+    utils::pretty::Pretty,
 };
 
 pub mod path;
@@ -112,7 +116,7 @@ impl State {
             .collect()
     }
 
-    pub fn enable_module(&mut self, env: &Env, name: &str, modules: ModuleSet) -> Result<()> {
+    pub fn enable_module(&mut self, env: &mut Env, name: &str, modules: ModuleSet) -> Result<()> {
         if let Err(err) = modules
             .enable(env, self, name)
             .with_context(|| format!("Couldn't enable module {}", name.magenta()))
@@ -144,7 +148,7 @@ impl State {
 
     pub fn update_module(
         &mut self,
-        env: &Env,
+        env: &mut Env,
         name: &str,
         modules: Option<ModuleSet>,
     ) -> Result<()> {

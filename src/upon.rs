@@ -1,7 +1,6 @@
 use std::{collections::HashMap, sync::OnceLock};
 
 use anyhow::Result;
-use derive_more::Display;
 use thiserror::Error;
 use toml::Value;
 use upon::Engine;
@@ -20,11 +19,11 @@ fn engine() -> &'static Engine<'static> {
 
 /// Error type that wraps `upon::Error` to enable pretty printing in `anyhow`
 /// context.
-#[derive(Display, Debug, Error)]
+#[derive(Debug, Error)]
 enum TemplateError {
-    #[display("Couldn't compile template: {_0:#}")]
+    #[error("Couldn't compile template: {0:#}")]
     Compile(upon::Error),
-    #[display("Couldn't render template: {_0:#}")]
+    #[error("Couldn't render template: {0:#}")]
     Render(upon::Error),
 }
 

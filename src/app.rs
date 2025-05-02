@@ -45,7 +45,7 @@ impl App {
             let modules = module.import(name)?;
             if !self.state.is_module_enabled(name) {
                 has_enabled = true;
-                if let Err(err) = self.state.enable_module(&self.env, name, modules) {
+                if let Err(err) = self.state.enable_module(&mut self.env, name, modules) {
                     eprintln!("{} {err:?}", "error:".red());
                 } else {
                     println!("Enabled {}", name.magenta());
@@ -105,7 +105,7 @@ impl App {
             let name = name.as_ref();
             let modules = config::module(name).map(|(_, module)| module.import(name));
             self.state
-                .update_module(&self.env, name, modules.transpose()?)?;
+                .update_module(&mut self.env, name, modules.transpose()?)?;
             println!("Updated {}", name.magenta());
         }
         Ok(has_updated)

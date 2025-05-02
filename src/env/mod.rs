@@ -6,10 +6,10 @@ use std::{
 
 use anyhow::Result;
 use dirs::Dirs;
-use users::Users;
+use users::{User, Users};
 
-mod dirs;
-mod users;
+pub mod dirs;
+pub mod users;
 
 pub struct Env {
     dirs: Dirs,
@@ -20,16 +20,21 @@ impl Env {
     pub fn load(config_dir: Option<PathBuf>) -> Result<Self> {
         Ok(Env {
             dirs: Dirs::load(config_dir)?,
-            users: Users::load(),
+            users: Users::default(),
         })
     }
 
-    pub fn is_current_uid(&self, uid: u32) -> bool {
-        uid == self.users.uid()
+    /// Returns user with name `name` if that user isn't the current user.
+    pub fn other_user(&mut self, name: &str) -> Result<Option<&User>> {
+        let current_uid = self.users.uid();
+        Ok(Some(self.users.user(name)?).filter(|user| user.uid != current_uid))
     }
 
-    pub fn is_current_gid(&self, gid: u32) -> bool {
-        gid == self.users.gid()
+    /// Returns GID of group with name `name` if that group isn't the current
+    /// group.
+    pub fn other_group(&mut self, name: &str) -> Result<Option<u32>> {
+        let current_gid = self.users.gid();
+        Ok(Some(self.users.gid_of(name)?).filter(|gid| *gid != current_gid))
     }
 
     const TILDE: &str = "~";
