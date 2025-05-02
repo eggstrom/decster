@@ -34,11 +34,11 @@ pub struct Config {
 
 impl Config {
     pub fn load(env: &Env, behavior: Behavior) -> Result<Self> {
-        let mut config = Config::parse(env.config())?;
+        let mut config = Config::parse(env.config_file())?;
         config.behavior = behavior;
-        config.load_modules(env.modules())?;
-        config.load_static_sources(env.static_sources())?;
-        config.load_dynamic_sources(env.dynamic_sources())?;
+        config.load_modules(env.module_dir())?;
+        config.load_static_sources(env.static_source_dir())?;
+        config.load_dynamic_sources(env.dynamic_source_file())?;
         Ok(config)
     }
 

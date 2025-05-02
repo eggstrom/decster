@@ -44,8 +44,8 @@ impl SourceIdent {
 
     pub fn path(&self, env: &Env) -> PathBuf {
         match self {
-            SourceIdent::Named(name) => env.named_sources().join(name),
-            SourceIdent::Unnamed { module, path } => env.unnamed_sources().join({
+            SourceIdent::Named(name) => env.named_source_dir().join(name),
+            SourceIdent::Unnamed { module, path } => env.unnamed_source_dir().join({
                 let mut hasher = Sha256::new();
                 hasher.update(module);
                 hasher.update(path.to_string_lossy().as_ref());

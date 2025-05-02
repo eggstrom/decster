@@ -18,11 +18,11 @@ pub struct SourceName(String);
 
 impl SourceName {
     pub fn static_path(&self, env: &Env) -> PathBuf {
-        env.static_sources().join(self)
+        env.static_source_dir().join(self)
     }
 
     pub fn named_path(&self, env: &Env) -> PathBuf {
-        env.named_sources().join(self)
+        env.named_source_dir().join(self)
     }
 }
 

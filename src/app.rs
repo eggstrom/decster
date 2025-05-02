@@ -161,7 +161,7 @@ impl App {
         let mut has_sources = false;
         for source in static_sources {
             print!("({}) ", "Static".blue());
-            Self::print_source_hash(source, &self.env.static_sources().join(source));
+            Self::print_source_hash(source, &self.env.static_source_dir().join(source));
             has_sources = true;
         }
         for source in dynamic_sources {

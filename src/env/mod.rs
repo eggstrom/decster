@@ -5,21 +5,21 @@ use std::{
 };
 
 use anyhow::Result;
-use dirs::Dirs;
+use paths::Paths;
 use users::{User, Users};
 
-pub mod dirs;
+pub mod paths;
 pub mod users;
 
 pub struct Env {
-    dirs: Dirs,
+    paths: Paths,
     users: Users,
 }
 
 impl Env {
     pub fn load(config_dir: Option<PathBuf>) -> Result<Self> {
         Ok(Env {
-            dirs: Dirs::load(config_dir)?,
+            paths: Paths::load(config_dir)?,
             users: Users::default(),
         })
     }
@@ -43,14 +43,10 @@ impl Env {
         Ok(Some(self.users.group_gid(name)?).filter(|gid| *gid != current_gid))
     }
 
-    fn home_of(&mut self, name: &str) -> Result<&Path> {
-        Ok(&self.users.user_with_name(name)?.home)
-    }
-
     const TILDE: &str = "~";
 
     pub fn tildefy<'a>(&self, path: &'a Path) -> Cow<'a, Path> {
-        match path.strip_prefix(self.home()) {
+        match path.strip_prefix(self.home_dir()) {
             Ok(path) => match path.parent() {
                 None => Cow::Borrowed(Path::new(Self::TILDE)),
                 Some(_) => Cow::Owned(Path::new(Self::TILDE).join(path)),
@@ -65,8 +61,8 @@ impl Env {
             let prefix = prefix.as_os_str().to_string_lossy();
             if let Some(user) = prefix.strip_prefix(Self::TILDE) {
                 let path = match user {
-                    "" => self.home(),
-                    name => self.home_of(name)?,
+                    "" => self.home_dir(),
+                    name => self.users.user_with_name(name)?.home.as_path(),
                 }
                 .join(components);
                 return Ok(Cow::Owned(path));
@@ -77,9 +73,9 @@ impl Env {
 }
 
 impl Deref for Env {
-    type Target = Dirs;
+    type Target = Paths;
 
     fn deref(&self) -> &Self::Target {
-        &self.dirs
+        &self.paths
     }
 }

@@ -47,7 +47,7 @@ impl ModuleSource {
                 hasher.update(path.to_string_lossy().as_ref());
                 let hash = Sha256Hash::from(hasher.finalize());
                 let ident = SourceIdent::unnamed(module, path);
-                let path = env.unnamed_sources().join(hash.to_string());
+                let path = env.unnamed_source_dir().join(hash.to_string());
                 (path, Some((ident, source)))
             }
         };

@@ -28,17 +28,17 @@ pub struct State {
 
 impl State {
     pub fn load(env: &Env) -> Result<Self> {
-        let dir = env.named_sources();
+        let dir = env.named_source_dir();
         fs::create_dir_all(dir)
             .with_context(|| format!("Couldn't create path: {}", env.tildefy(dir).pretty()))?;
-        Ok(File::open(env.state())
+        Ok(File::open(env.state_file())
             .ok()
             .and_then(|mut file| bincode::decode_from_std_read(&mut file, Self::bin_config()).ok())
             .unwrap_or_default())
     }
 
     pub fn save(&self, env: &Env) -> Result<()> {
-        let mut file = File::create(env.state())?;
+        let mut file = File::create(env.state_file())?;
         bincode::encode_into_std_write(self, &mut file, Self::bin_config())?;
         Ok(())
     }
