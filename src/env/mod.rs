@@ -25,9 +25,15 @@ impl Env {
     }
 
     /// Returns user with name `name` if that user isn't the current user.
-    pub fn other_user(&mut self, name: &str) -> Result<Option<&User>> {
+    pub fn other_user_by_name(&mut self, name: &str) -> Result<Option<&User>> {
         let current_uid = self.users.uid();
-        Ok(Some(self.users.user(name)?).filter(|user| user.uid != current_uid))
+        Ok(Some(self.users.user_by_name(name)?).filter(|user| user.uid != current_uid))
+    }
+
+    /// Returns user with UID `uid` if that user isn't the current user.
+    pub fn other_user_by_uid(&mut self, uid: u32) -> Result<Option<&User>> {
+        let current_uid = self.users.uid();
+        Ok(Some(self.users.user_by_uid(uid)?).filter(|user| user.uid != current_uid))
     }
 
     /// Returns GID of group with name `name` if that group isn't the current
@@ -38,7 +44,7 @@ impl Env {
     }
 
     fn home_of(&mut self, name: &str) -> Result<&Path> {
-        Ok(&self.users.user(name)?.home)
+        Ok(&self.users.user_by_name(name)?.home)
     }
 
     const TILDE: &str = "~";

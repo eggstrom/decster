@@ -7,6 +7,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+use derive_more::From;
 use serde::{
     Deserialize, Deserializer,
     de::{self, Visitor},
@@ -17,47 +18,64 @@ use crate::{env::Env, utils::pretty::Pretty};
 
 #[derive(Debug, Default, PartialEq)]
 pub struct Owner {
-    user: Option<String>,
-    group: Option<Group>,
+    user: Option<OwnerIdent>,
+    group: Option<OwnerGroup>,
 }
 
-#[derive(Debug, PartialEq)]
-enum Group {
-    Name(String),
+#[derive(Debug, From, PartialEq)]
+enum OwnerGroup {
+    #[from(forward)]
+    Ident(OwnerIdent),
     LoginGroup,
 }
 
+#[derive(Debug, PartialEq)]
+enum OwnerIdent {
+    Id(u32),
+    Name(String),
+}
+
+impl From<&str> for OwnerIdent {
+    fn from(s: &str) -> Self {
+        match s.parse() {
+            Ok(id) => OwnerIdent::Id(id),
+            Err(_) => OwnerIdent::Name(s.to_string()),
+        }
+    }
+}
+
 impl Owner {
-    fn new(user: Option<String>, group: Option<Group>) -> Self {
+    fn new(user: Option<OwnerIdent>, group: Option<OwnerGroup>) -> Self {
         Owner { user, group }
     }
 
-    fn user(user: &str) -> Self {
-        Owner::new(Some(user.to_string()), None)
+    fn user(user: impl Into<OwnerIdent>) -> Self {
+        Owner::new(Some(user.into()), None)
     }
 
-    fn user_with_login_group(user: &str) -> Self {
-        Owner::new(Some(user.to_string()), Some(Group::LoginGroup))
+    fn user_with_login_group(user: impl Into<OwnerIdent>) -> Self {
+        Owner::new(Some(user.into()), Some(OwnerGroup::LoginGroup))
     }
 
-    fn user_with_group(user: &str, group: &str) -> Self {
-        Owner::new(Some(user.to_string()), Some(Group::Name(group.to_string())))
+    fn user_with_group(user: impl Into<OwnerIdent>, group: impl Into<OwnerGroup>) -> Self {
+        Owner::new(Some(user.into()), Some(group.into()))
     }
 
-    fn group(group: &str) -> Self {
-        Owner::new(None, Some(Group::Name(group.to_string())))
+    fn group(group: impl Into<OwnerGroup>) -> Self {
+        Owner::new(None, Some(group.into()))
     }
 
     pub fn ids(&self, env: &mut Env) -> Result<OwnerIds> {
-        let user = self
-            .user
-            .as_ref()
-            .and_then(|name| env.other_user(name).transpose())
-            .transpose()?;
+        let user = match &self.user {
+            Some(OwnerIdent::Id(uid)) => env.other_user_by_uid(*uid)?,
+            Some(OwnerIdent::Name(name)) => env.other_user_by_name(name)?,
+            None => None,
+        };
         let uid = user.as_ref().map(|user| user.uid);
         let gid = match &self.group {
-            Some(Group::Name(name)) => env.other_group_gid(name)?,
-            Some(Group::LoginGroup) => user.as_ref().map(|user| user.gid),
+            Some(OwnerGroup::LoginGroup) => user.as_ref().map(|user| user.gid),
+            Some(OwnerGroup::Ident(OwnerIdent::Id(gid))) => Some(*gid),
+            Some(OwnerGroup::Ident(OwnerIdent::Name(name))) => env.other_group_gid(name)?,
             None => None,
         };
         Ok(OwnerIds { uid, gid })
