@@ -34,7 +34,7 @@ pub enum Source {
 }
 
 impl Source {
-    pub fn fetch(&self, env: &Env, source_path: &Path) -> Result<()> {
+    pub fn fetch(&self, env: &mut Env, source_path: &Path) -> Result<()> {
         if source_path.exists() || source_path.is_symlink() {
             crate::fs::remove_all(source_path)?;
         }
@@ -42,7 +42,7 @@ impl Source {
         match self {
             Source::Text(text) => Self::fetch_text(source_path, text),
             Source::Symlink(path) => Self::fetch_symlink(source_path, path),
-            Source::Path(path) => Self::fetch_path(source_path, &env.untildefy(path)),
+            Source::Path(path) => Self::fetch_path(source_path, &env.untildefy(path)?),
             #[cfg(feature = "http")]
             Source::Url(url) => Self::fetch_url(source_path, url),
         }

@@ -7,7 +7,10 @@ use bincode::{Decode, Encode};
 use crossterm::style::Stylize;
 use sha2::{Digest, Sha256};
 
-use crate::{env::Env, utils::{pretty::Pretty, sha256::Sha256Hash}};
+use crate::{
+    env::Env,
+    utils::{pretty::Pretty, sha256::Sha256Hash},
+};
 
 use super::name::SourceName;
 

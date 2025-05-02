@@ -56,7 +56,7 @@ impl Owner {
             .transpose()?;
         let uid = user.as_ref().map(|user| user.uid);
         let gid = match &self.group {
-            Some(Group::Name(name)) => env.other_group(name)?,
+            Some(Group::Name(name)) => env.other_group_gid(name)?,
             Some(Group::LoginGroup) => user.as_ref().map(|user| user.gid),
             None => None,
         };

@@ -13,7 +13,11 @@ use derive_more::Display;
 use toml::Value;
 
 use crate::{
-    env::Env, fs::{mode::Mode, owner::OwnerIds}, state::{path::PathInfo, State}, upon, utils::{pretty::Pretty, sha256::Sha256Hash}
+    env::Env,
+    fs::{mode::Mode, owner::OwnerIds},
+    state::{State, path::PathInfo},
+    upon,
+    utils::{pretty::Pretty, sha256::Sha256Hash},
 };
 
 use super::source::ModuleSource;
@@ -59,13 +63,13 @@ impl<'a> ModuleLink<'a> {
 
     pub fn create(
         &self,
-        env: &Env,
+        env: &mut Env,
         state: &mut State,
         module: &str,
         context: &HashMap<&str, &Value>,
     ) -> Result<()> {
         let source_path = self.source.fetch(env, state, module, self.path)?;
-        let link_path = env.untildefy(self.path);
+        let link_path = env.untildefy(self.path)?;
         self.create_path(env, state, module, &link_path)?;
 
         crate::fs::walk_dir_rel(source_path, false, false, |path, rel_path| {

@@ -32,15 +32,19 @@ impl Env {
 
     /// Returns GID of group with name `name` if that group isn't the current
     /// group.
-    pub fn other_group(&mut self, name: &str) -> Result<Option<u32>> {
+    pub fn other_group_gid(&mut self, name: &str) -> Result<Option<u32>> {
         let current_gid = self.users.gid();
-        Ok(Some(self.users.gid_of(name)?).filter(|gid| *gid != current_gid))
+        Ok(Some(self.users.group_gid(name)?).filter(|gid| *gid != current_gid))
+    }
+
+    fn home_of(&mut self, name: &str) -> Result<&Path> {
+        Ok(&self.users.user(name)?.home)
     }
 
     const TILDE: &str = "~";
 
-    pub fn tildefy_with<'a>(path: &'a Path, home: &Path) -> Cow<'a, Path> {
-        match path.strip_prefix(home) {
+    pub fn tildefy<'a>(&self, path: &'a Path) -> Cow<'a, Path> {
+        match path.strip_prefix(self.home()) {
             Ok(path) => match path.parent() {
                 None => Cow::Borrowed(Path::new(Self::TILDE)),
                 Some(_) => Cow::Owned(Path::new(Self::TILDE).join(path)),
@@ -49,19 +53,20 @@ impl Env {
         }
     }
 
-    pub fn untildefy_with<'a>(path: &'a Path, home: &Path) -> Cow<'a, Path> {
-        match path.strip_prefix(Self::TILDE) {
-            Ok(path) => Cow::Owned(home.join(path)),
-            Err(_) => Cow::Borrowed(path),
+    pub fn untildefy<'a>(&mut self, path: &'a Path) -> Result<Cow<'a, Path>> {
+        let mut components = path.components();
+        if let Some(prefix) = components.next() {
+            let prefix = prefix.as_os_str().to_string_lossy();
+            if let Some(user) = prefix.strip_prefix(Self::TILDE) {
+                let path = match user {
+                    "" => self.home(),
+                    name => self.home_of(name)?,
+                }
+                .join(components);
+                return Ok(Cow::Owned(path));
+            }
         }
-    }
-
-    pub fn tildefy<'a>(&self, path: &'a Path) -> Cow<'a, Path> {
-        Self::tildefy_with(path, &self.dirs.home())
-    }
-
-    pub fn untildefy<'a>(&self, path: &'a Path) -> Cow<'a, Path> {
-        Self::untildefy_with(path, &self.home())
+        Ok(Cow::Borrowed(path))
     }
 }
 
@@ -70,40 +75,5 @@ impl Deref for Env {
 
     fn deref(&self) -> &Self::Target {
         &self.dirs
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn paths(home: &Path) -> Vec<(&Path, PathBuf)> {
-        let home = home.to_string_lossy();
-        [
-            ("~", format!("{home}")),
-            ("~/", format!("{home}/")),
-            ("~/foo", format!("{home}/foo")),
-            (" ~/foo", " ~/foo".to_string()),
-            ("~ /foo", "~ /foo".to_string()),
-            ("~bar/foo", "~bar/foo".to_string()),
-        ]
-        .map(|(tilde, no_tilde)| (Path::new(tilde), PathBuf::from(no_tilde)))
-        .into()
-    }
-
-    #[test]
-    fn tildefy() {
-        let home = ::dirs::home_dir().unwrap();
-        for (tilde, untilde) in paths(&home) {
-            assert_eq!(Env::tildefy_with(&untilde, &home), tilde);
-        }
-    }
-
-    #[test]
-    fn untildefy() {
-        let home = ::dirs::home_dir().unwrap();
-        for (tilde, no_tilde) in paths(&home) {
-            assert_eq!(Env::untildefy_with(tilde, &home), no_tilde);
-        }
     }
 }

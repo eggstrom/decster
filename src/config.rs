@@ -34,11 +34,11 @@ pub struct Config {
 
 impl Config {
     pub fn load(env: &Env, behavior: Behavior) -> Result<Self> {
-        let mut config = Config::parse(&env.config())?;
+        let mut config = Config::parse(env.config())?;
         config.behavior = behavior;
-        config.load_modules(&env.modules())?;
-        config.load_static_sources(&env.static_sources())?;
-        config.load_dynamic_sources(&env.dynamic_sources())?;
+        config.load_modules(env.modules())?;
+        config.load_static_sources(env.static_sources())?;
+        config.load_dynamic_sources(env.dynamic_sources())?;
         Ok(config)
     }
 
@@ -99,7 +99,7 @@ pub fn load(env: &Env, behavior: Behavior) -> Result<()> {
 fn config() -> &'static Config {
     CONFIG
         .get()
-        .expect("`config::load` should be called without failing before config is read")
+        .expect("`config::load` should be called without failing before config is used")
 }
 
 pub fn fetch() -> bool {

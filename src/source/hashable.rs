@@ -17,7 +17,7 @@ pub struct HashableSource {
 }
 
 impl HashableSource {
-    pub fn fetch(&self, env: &Env, path: &Path) -> Result<()> {
+    pub fn fetch(&self, env: &mut Env, path: &Path) -> Result<()> {
         self.source.fetch(env, path)?;
         self.check(path)?;
         Ok(())

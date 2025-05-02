@@ -1,6 +1,7 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::{Result, anyhow};
+use crossterm::style::Stylize;
 use nix::unistd::{self, Group};
 
 pub struct User {
@@ -45,10 +46,10 @@ impl Users {
             .get(name)
             .unwrap()
             .as_ref()
-            .ok_or(anyhow!("User doesn't exist"))
+            .ok_or_else(|| anyhow!("User `{}` doesn't exist", name.magenta()))
     }
 
-    pub fn gid_of(&mut self, name: &str) -> Result<u32> {
+    pub fn group_gid(&mut self, name: &str) -> Result<u32> {
         if !self.groups.contains_key(name) {
             let group = Group::from_name(name)?.map(|group| group.gid.as_raw());
             self.groups.insert(name.to_string(), group);
@@ -56,6 +57,6 @@ impl Users {
         self.groups
             .get(name)
             .unwrap()
-            .ok_or(anyhow!("Group doesn't exist"))
+            .ok_or(anyhow!("Group `{}` doesn't exist", name.magenta()))
     }
 }

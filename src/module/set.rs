@@ -5,6 +5,7 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use crossterm::style::Stylize;
+use derive_more::From;
 use indexmap::IndexMap;
 use toml::Value;
 
@@ -20,8 +21,9 @@ use super::{
     source::ModuleSource,
 };
 
+#[derive(From)]
 pub struct ModuleSet<'a> {
-    pub(super) modules: IndexMap<&'a str, &'a Module>,
+    modules: IndexMap<&'a str, &'a Module>,
 }
 
 impl<'a> ModuleSet<'a> {

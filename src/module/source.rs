@@ -25,7 +25,7 @@ pub enum ModuleSource {
 impl ModuleSource {
     pub fn fetch(
         &self,
-        env: &Env,
+        env: &mut Env,
         state: &mut State,
         module: &str,
         path: &Path,

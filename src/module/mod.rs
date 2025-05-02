@@ -57,7 +57,7 @@ impl Module {
     pub fn import<'a>(&'a self, name: &'a str) -> Result<ModuleSet<'a>> {
         let mut modules = IndexMap::from([(name, self)]);
         Self::import_inner(&mut modules, &self.imports)?;
-        Ok(ModuleSet { modules })
+        Ok(ModuleSet::from(modules))
     }
 
     fn import_inner(modules: &mut IndexMap<&str, &Module>, imports: &Globs) -> Result<()> {
