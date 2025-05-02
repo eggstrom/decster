@@ -67,8 +67,8 @@ impl Owner {
 
     pub fn ids(&self, env: &mut Env) -> Result<OwnerIds> {
         let user = match &self.user {
-            Some(OwnerIdent::Id(uid)) => env.other_user_by_uid(*uid)?,
-            Some(OwnerIdent::Name(name)) => env.other_user_by_name(name)?,
+            Some(OwnerIdent::Id(uid)) => env.other_user_with_uid(*uid)?,
+            Some(OwnerIdent::Name(name)) => env.other_user_with_name(name)?,
             None => None,
         };
         let uid = user.as_ref().map(|user| user.uid);

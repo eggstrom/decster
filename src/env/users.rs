@@ -48,7 +48,7 @@ impl Users {
         *self.gid.get_or_insert_with(|| unistd::getgid().as_raw())
     }
 
-    pub fn user_by_name<'a>(&'a mut self, name: &str) -> Result<&'a User> {
+    pub fn user_with_name<'a>(&'a mut self, name: &str) -> Result<&'a User> {
         if !self.users_by_name.contains_key(name) {
             if let Some((name, user)) = User::from_name(name)? {
                 self.users_by_name.insert(name, Some(Rc::clone(&user)));
@@ -64,7 +64,7 @@ impl Users {
             .ok_or_else(|| anyhow!("User `{}` doesn't exist", name.magenta()))
     }
 
-    pub fn user_by_uid(&mut self, uid: u32) -> Result<&User> {
+    pub fn user_with_uid(&mut self, uid: u32) -> Result<&User> {
         if !self.users_by_uid.contains_key(&uid) {
             if let Some((name, user)) = User::from_uid(uid)? {
                 self.users_by_name.insert(name, Some(Rc::clone(&user)));
