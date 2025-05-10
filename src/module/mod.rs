@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     fs,
     path::{Path, PathBuf},
 };
@@ -15,6 +15,7 @@ use crate::{
     config,
     fs::{mode::Mode, owner::Owner},
     globs::Globs,
+    packages::PackageManager,
 };
 
 pub mod link;
@@ -43,6 +44,9 @@ pub struct Module {
 
     #[serde(default)]
     context: HashMap<String, Value>,
+
+    #[serde(default)]
+    packages: BTreeMap<PackageManager, BTreeSet<String>>,
 }
 
 impl Module {

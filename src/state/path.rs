@@ -103,7 +103,7 @@ impl Display for PathKind {
         match self {
             PathKind::Directory => "Directory".blue(),
             PathKind::File => "File".blue(),
-            PathKind::HardLink => "HardLink".blue(),
+            PathKind::HardLink => "Hard link".blue(),
             PathKind::Symlink => "Symlink".blue(),
         }
         .fmt(f)

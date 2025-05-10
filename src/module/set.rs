@@ -12,6 +12,7 @@ use toml::Value;
 use crate::{
     env::Env,
     fs::{mode::Mode, owner::OwnerIds},
+    packages::PackageManager,
     state::State,
 };
 
@@ -73,8 +74,21 @@ impl<'a> ModuleSet<'a> {
         Ok(context)
     }
 
+    fn packages(&self) -> BTreeMap<PackageManager, BTreeSet<String>> {
+        let mut all_packages = BTreeMap::new();
+        for (_, module) in &self.modules {
+            for (manager, manager_packages) in &module.packages {
+                let packages: &mut BTreeSet<_> = all_packages.entry(*manager).or_default();
+                for package in manager_packages {
+                    packages.insert(package.clone());
+                }
+            }
+        }
+        all_packages
+    }
+
     pub fn enable(&self, env: &mut Env, state: &mut State, name: &str) -> Result<()> {
-        state.add_module(name);
+        state.add_module(name, self.packages());
         for link in self.links(env)? {
             link.create(env, state, name, &self.context()?)
                 .with_context(|| format!("Couldn't create link: {link}"))?

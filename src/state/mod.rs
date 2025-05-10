@@ -1,5 +1,6 @@
 use std::{
-    collections::{BTreeMap, HashSet},
+    borrow::Cow,
+    collections::{BTreeMap, BTreeSet, HashSet},
     fs::{self, File},
     path::{Path, PathBuf},
 };
@@ -13,6 +14,7 @@ use crate::{
     env::Env,
     globs::Globs,
     module::set::ModuleSet,
+    packages::PackageManager,
     source::{hashable::HashableSource, ident::SourceIdent},
     utils::pretty::Pretty,
 };
@@ -24,6 +26,7 @@ pub struct State {
     sources: BTreeMap<SourceIdent, HashableSource>,
     module_paths: BTreeMap<String, Vec<(PathBuf, PathInfo)>>,
     paths: HashSet<PathBuf>,
+    packages: BTreeMap<String, BTreeMap<PackageManager, BTreeSet<String>>>,
 }
 
 impl State {
@@ -78,9 +81,10 @@ impl State {
         self.paths.contains(path.as_ref())
     }
 
-    pub fn add_module(&mut self, name: &str) {
+    pub fn add_module(&mut self, name: &str, packages: BTreeMap<PackageManager, BTreeSet<String>>) {
         if !self.module_paths.contains_key(name) {
             self.module_paths.insert(name.to_string(), Vec::new());
+            self.packages.insert(name.to_string(), packages);
         }
     }
 
@@ -102,6 +106,20 @@ impl State {
         self.module_paths
             .iter()
             .map(|(name, paths)| (name.as_str(), paths.as_slice()))
+    }
+
+    /// The reason for the return type containing `Cow<str>` is that it's later
+    /// used in `PackageManager::diff`. That function uses
+    /// `BTreeSet::difference`, which can't compare `&str` with `String`.
+    pub fn packages(&self) -> BTreeMap<PackageManager, BTreeSet<Cow<str>>> {
+        let mut all_packages = BTreeMap::new();
+        for (manager, manager_packages) in self.packages.iter().flat_map(|(_, pm)| pm.iter()) {
+            let packages: &mut BTreeSet<_> = all_packages.entry(*manager).or_default();
+            for package in manager_packages {
+                packages.insert(Cow::Borrowed(package.as_str()));
+            }
+        }
+        all_packages
     }
 
     pub fn modules(&self) -> Vec<String> {

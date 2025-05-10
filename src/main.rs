@@ -11,6 +11,7 @@ mod globs;
 #[cfg(feature = "http")]
 mod http;
 mod module;
+mod packages;
 mod source;
 mod state;
 mod upon;

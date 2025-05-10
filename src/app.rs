@@ -11,7 +11,7 @@ use clap::Parser;
 use crossterm::style::Stylize;
 
 use crate::{
-    cli::{Cli, CliCommand},
+    cli::{Cli, CliCommand, SyncArgs},
     config,
     env::Env,
     globs::Globs,
@@ -40,6 +40,7 @@ impl App {
             CliCommand::List => app.list(),
             CliCommand::Paths => app.paths()?,
             CliCommand::Hash { sources } => app.hash(&sources)?,
+            CliCommand::Sync(args) => app.sync(&args)?,
             CliCommand::Git { args } => app.git(&args),
         }
         Ok(())
@@ -184,6 +185,14 @@ impl App {
             Ok(hash) => println!("{hash}"),
             Err(err) => println!("{} {err:?}", "error:".red()),
         }
+    }
+
+    fn sync(&self, args: &SyncArgs) -> Result<()> {
+        let (install, uninstall) = args.should_install_and_uninstall();
+        for (manager, packages) in self.state.packages() {
+            manager.sync(install, uninstall, &packages)?;
+        }
+        Ok(())
     }
 
     fn git(&self, args: &[String]) {
