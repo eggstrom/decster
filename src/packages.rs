@@ -72,9 +72,9 @@ impl PackageManager {
         (old, new)
     }
 
-    fn update_packages(command: &[&str], packages: &[&str]) -> io::Result<()> {
-        let mut command = Command::new(command[0])
-            .args(&command[1..])
+    fn update_packages<M: Manager>(args: &[&str], packages: &[&str]) -> io::Result<()> {
+        let mut command = Command::new(if M::NEEDS_ROOT { "sudo" } else { args[0] })
+            .args(if M::NEEDS_ROOT { args } else { &args[1..] })
             .stdin(Stdio::piped())
             .spawn()?;
         let stdin = command.stdin.as_mut().unwrap();
@@ -87,15 +87,17 @@ impl PackageManager {
     }
 
     fn install<M: Manager>(packages: &[&str]) -> Result<()> {
-        Self::update_packages(M::INSTALL, packages).context("Couldn't install packages")
+        Self::update_packages::<M>(M::INSTALL, packages).context("Couldn't install packages")
     }
 
     fn uninstall<M: Manager>(packages: &[&str]) -> Result<()> {
-        Self::update_packages(M::UNINSTALL, packages).context("Couldn't uninstall packages")
+        Self::update_packages::<M>(M::UNINSTALL, packages).context("Couldn't uninstall packages")
     }
 }
 
 pub trait Manager {
+    /// Whether the package manager needs to be run as root.
+    const NEEDS_ROOT: bool = true;
     /// Command used to get a list of currently installed packages.
     const LIST: &[&str];
     /// Command used to install packages.
@@ -115,6 +117,7 @@ impl Manager for Pacman {
 struct Paru;
 
 impl Manager for Paru {
+    const NEEDS_ROOT: bool = false;
     const LIST: &[&str] = &["paru", "-Qqem"];
     const INSTALL: &[&str] = &["paru", "-S", "-"];
     const UNINSTALL: &[&str] = &["paru", "-Rnsu", "-"];
