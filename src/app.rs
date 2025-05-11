@@ -26,7 +26,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn run() -> Result<()> {
+    pub fn start() -> Result<()> {
         let cli = Cli::parse();
         let env = Env::load(cli.config)?;
         config::load(&env, cli.behavior)?;
@@ -41,7 +41,7 @@ impl App {
             CliCommand::Paths => app.paths()?,
             CliCommand::Hash { sources } => app.hash(&sources)?,
             CliCommand::Sync(args) => app.sync(&args)?,
-            CliCommand::Git { args } => app.git(&args),
+            CliCommand::Run { args } => app.run(&args),
         }
         Ok(())
     }
@@ -195,15 +195,16 @@ impl App {
         Ok(())
     }
 
-    fn git(&self, args: &[String]) {
-        if let Some(err) = Command::new("git")
-            .args(args)
+    fn run(&self, args: &[String]) {
+        let mut command = Command::new(&args[0]);
+        if args.len() > 1 {
+            command.args(&args[1..]);
+        }
+        command
             .current_dir(self.env.config_dir())
             .stdout(io::stdout())
-            .stderr(io::stderr())
-            .exec()
-            .raw_os_error()
-        {
+            .stderr(io::stderr());
+        if let Some(err) = command.exec().raw_os_error() {
             process::exit(err);
         }
     }

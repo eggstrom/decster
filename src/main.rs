@@ -18,7 +18,7 @@ mod upon;
 mod utils;
 
 fn main() {
-    if let Err(err) = App::run() {
+    if let Err(err) = App::start() {
         eprintln!("{} {err:?}", "error:".red());
         process::exit(1);
     }

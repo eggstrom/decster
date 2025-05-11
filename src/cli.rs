@@ -22,36 +22,29 @@ pub struct Behavior {
 
 #[derive(Clone, Debug, Subcommand)]
 pub enum CliCommand {
-    #[command()]
     /// Enable modules
     Enable {
         #[arg(required = true)]
         modules: Vec<String>,
     },
     /// Disable modules
-    #[command()]
     Disable {
         #[arg(required = true)]
         modules: Vec<String>,
     },
     /// Disable and re-enable modules
-    #[command()]
     Update { modules: Vec<String> },
     /// Show module definitions
-    #[command()]
     List,
     /// Show owned paths
-    #[command()]
     Paths,
     /// Show hashes of fetched sources
-    #[command()]
     Hash { sources: Vec<String> },
     /// Update system packages to match enabled modules
     Sync(SyncArgs),
-    /// Run Git commands in config directory
-    #[command()]
-    Git {
-        #[arg(allow_hyphen_values = true)]
+    /// Run commands in config directory
+    Run {
+        #[arg(required = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
 }
