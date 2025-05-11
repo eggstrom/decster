@@ -9,7 +9,6 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 
 use crate::{
-    cli::Behavior,
     globs::Globs,
     module::Module,
     source::{hashable::HashableSource, name::SourceName},
@@ -21,8 +20,11 @@ use super::env::Env;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Config {
-    #[serde(skip)]
-    behavior: Behavior,
+    #[serde(default)]
+    fetch: bool,
+
+    #[serde(default)]
+    aliases: BTreeMap<String, String>,
 
     #[serde(skip, default)]
     modules: BTreeMap<String, Module>,
@@ -33,9 +35,8 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load(env: &Env, behavior: Behavior) -> Result<Self> {
+    pub fn load(env: &Env) -> Result<Self> {
         let mut config = Config::parse(env.config_file())?;
-        config.behavior = behavior;
         config.load_modules(env.module_dir())?;
         config.load_static_sources(env.static_source_dir())?;
         config.load_dynamic_sources(env.dynamic_source_file())?;
@@ -88,9 +89,9 @@ impl Config {
 
 static CONFIG: OnceLock<Config> = OnceLock::new();
 
-pub fn load(env: &Env, behavior: Behavior) -> Result<()> {
+pub fn load(env: &Env) -> Result<()> {
     CONFIG
-        .set(Config::load(env, behavior)?)
+        .set(Config::load(env)?)
         .ok()
         .expect("`config::load` should only be called once");
     Ok(())
@@ -103,7 +104,14 @@ fn config() -> &'static Config {
 }
 
 pub fn fetch() -> bool {
-    config().behavior.fetch
+    config().fetch
+}
+
+pub fn aliases() -> impl Iterator<Item = (&'static str, &'static str)> {
+    config()
+        .aliases
+        .iter()
+        .map(|(alias, command)| (alias.as_str(), command.as_str()))
 }
 
 pub fn has_static_source(name: &SourceName) -> bool {

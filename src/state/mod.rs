@@ -148,6 +148,7 @@ impl State {
     }
 
     pub fn disable_module(&mut self, env: &Env, module: &str) -> Result<()> {
+        self.packages.remove(module);
         let paths = self
             .module_paths
             .get_mut(module)

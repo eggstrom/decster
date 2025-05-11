@@ -1,5 +1,5 @@
 use std::{
-    fs,
+    env, fs,
     path::{Path, PathBuf},
 };
 
@@ -20,10 +20,11 @@ pub struct Paths {
 impl Paths {
     const APP_NAME: &str = "decster";
 
-    pub fn load(config_dir: Option<PathBuf>) -> Result<Self> {
+    pub fn load() -> Result<Self> {
         let home_dir =
             dirs::home_dir().ok_or(anyhow!("Couldn't determine path of home directory"))?;
-        let config_dir = config_dir
+        let config_dir = env::var_os("DECSTER_CONFIG")
+            .map(PathBuf::from)
             .or(dirs::config_dir().map(|path| path.join(Self::APP_NAME)))
             .ok_or(anyhow!("Couldn't determine path of config directory"))?;
         let data_dir = dirs::data_dir()

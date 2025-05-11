@@ -1,8 +1,4 @@
-use std::{
-    borrow::Cow,
-    ops::Deref,
-    path::{Path, PathBuf},
-};
+use std::{borrow::Cow, ops::Deref, path::Path};
 
 use anyhow::Result;
 use paths::Paths;
@@ -17,9 +13,9 @@ pub struct Env {
 }
 
 impl Env {
-    pub fn load(config_dir: Option<PathBuf>) -> Result<Self> {
+    pub fn load() -> Result<Self> {
         Ok(Env {
-            paths: Paths::load(config_dir)?,
+            paths: Paths::load()?,
             users: Users::default(),
         })
     }
