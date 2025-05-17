@@ -17,7 +17,7 @@ use crate::{
 
 use super::env::Env;
 
-#[derive(Deserialize)]
+#[derive(Default, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Config {
     #[serde(default)]
@@ -48,9 +48,12 @@ impl Config {
         P: AsRef<Path>,
     {
         let path = path.as_ref();
-        let text = fs::read_to_string(path)
-            .with_context(|| format!("Couldn't read config at {}", path.pretty()))?;
-        Ok(toml::from_str(&text)?)
+        Ok(fs::read_to_string(path)
+            .ok()
+            .map(|string| toml::from_str(&string))
+            .transpose()
+            .with_context(|| format!("Couldn't parse {}", path.pretty()))?
+            .unwrap_or_default())
     }
 
     fn load_modules(&mut self, dir: &Path) -> Result<()> {
