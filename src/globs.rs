@@ -1,19 +1,22 @@
-use std::{
-    fmt::{self, Display, Formatter},
-    path::Path,
-};
+use std::path::Path;
 
 use anyhow::Result;
 use globset::{GlobBuilder, GlobSet};
-use serde::{
-    Deserialize, Deserializer,
-    de::{self, SeqAccess, Visitor},
-};
+use serde::Deserialize;
 
-#[derive(Default)]
+#[derive(Default, Deserialize)]
+#[serde(try_from = "Vec<String>")]
 pub struct Globs {
     set: GlobSet,
     match_if_empty: bool,
+}
+
+impl TryFrom<Vec<String>> for Globs {
+    type Error = globset::Error;
+
+    fn try_from(value: Vec<String>) -> Result<Self, Self::Error> {
+        Self::strict(value)
+    }
 }
 
 impl Globs {
@@ -59,42 +62,5 @@ impl Globs {
         P: AsRef<Path>,
     {
         (self.match_if_empty && self.set.is_empty()) || self.set.is_match(path)
-    }
-}
-
-struct GlobsVisitor;
-
-impl<'de> Visitor<'de> for GlobsVisitor {
-    type Value = Globs;
-
-    fn expecting(&self, f: &mut Formatter) -> fmt::Result {
-        "a glob or a list of globs".fmt(f)
-    }
-
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        Globs::strict([v]).map_err(de::Error::custom)
-    }
-
-    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-    where
-        A: SeqAccess<'de>,
-    {
-        let mut globs = Vec::new();
-        while let Some(glob) = seq.next_element::<String>()? {
-            globs.push(glob);
-        }
-        Globs::strict(globs).map_err(de::Error::custom)
-    }
-}
-
-impl<'de> Deserialize<'de> for Globs {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_any(GlobsVisitor)
     }
 }
