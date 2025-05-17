@@ -8,6 +8,7 @@ use std::{
 use anyhow::{Context, Result, bail};
 use bincode::{Decode, Encode, config::Configuration};
 use crossterm::style::Stylize;
+use module::ModuleState;
 use path::PathInfo;
 
 use crate::{
@@ -19,14 +20,14 @@ use crate::{
     utils::pretty::Pretty,
 };
 
+pub mod module;
 pub mod path;
 
 #[derive(Decode, Default, Encode)]
 pub struct State {
     sources: BTreeMap<SourceIdent, HashableSource>,
-    module_paths: BTreeMap<String, Vec<(PathBuf, PathInfo)>>,
+    modules: BTreeMap<String, ModuleState>,
     paths: HashSet<PathBuf>,
-    packages: BTreeMap<String, BTreeMap<PackageManager, BTreeSet<String>>>,
 }
 
 impl State {
@@ -71,7 +72,7 @@ impl State {
     }
 
     pub fn is_module_enabled(&self, module: &str) -> bool {
-        self.module_paths.contains_key(module)
+        self.modules.contains_key(module)
     }
 
     pub fn is_path_owned<P>(&self, path: P) -> bool
@@ -82,9 +83,9 @@ impl State {
     }
 
     pub fn add_module(&mut self, name: &str, packages: BTreeMap<PackageManager, BTreeSet<String>>) {
-        if !self.module_paths.contains_key(name) {
-            self.module_paths.insert(name.to_string(), Vec::new());
-            self.packages.insert(name.to_string(), packages);
+        if !self.modules.contains_key(name) {
+            let state = ModuleState::with_packages(packages);
+            self.modules.insert(name.to_string(), state);
         }
     }
 
@@ -94,18 +95,18 @@ impl State {
 
     pub fn add_path(&mut self, module: &str, path: &Path, info: PathInfo) {
         self.paths.insert(path.to_path_buf());
-        if let Some(paths) = self.module_paths.get_mut(module) {
-            paths.push((path.to_path_buf(), info));
-        } else {
-            self.module_paths
-                .insert(module.into(), vec![(path.to_path_buf(), info)]);
-        }
+        self.modules
+            .get_mut(module)
+            .unwrap()
+            .push_path(path.to_path_buf(), info);
     }
 
-    pub fn owned_paths(&self) -> impl ExactSizeIterator<Item = (&str, &[(PathBuf, PathInfo)])> {
-        self.module_paths
+    pub fn owned_paths(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (&str, impl Iterator<Item = (&Path, &PathInfo)>)> {
+        self.modules
             .iter()
-            .map(|(name, paths)| (name.as_str(), paths.as_slice()))
+            .map(|(name, state)| (name.as_str(), state.paths()))
     }
 
     /// The reason for the return type containing `Cow<str>` is that it's later
@@ -113,21 +114,23 @@ impl State {
     /// `BTreeSet::difference`, which can't compare `&str` with `String`.
     pub fn packages(&self) -> BTreeMap<PackageManager, BTreeSet<Cow<str>>> {
         let mut all_packages = BTreeMap::new();
-        for (manager, manager_packages) in self.packages.iter().flat_map(|(_, pm)| pm.iter()) {
-            let packages: &mut BTreeSet<_> = all_packages.entry(*manager).or_default();
+        for (manager, manager_packages) in
+            self.modules.iter().flat_map(|(_, state)| state.packages())
+        {
+            let packages: &mut BTreeSet<_> = all_packages.entry(manager).or_default();
             for package in manager_packages {
-                packages.insert(Cow::Borrowed(package.as_str()));
+                packages.insert(Cow::Borrowed(package));
             }
         }
         all_packages
     }
 
     pub fn modules(&self) -> Vec<String> {
-        self.module_paths.keys().cloned().collect()
+        self.modules.keys().cloned().collect()
     }
 
     pub fn modules_matching_globs(&self, globs: &Globs) -> Vec<String> {
-        self.module_paths
+        self.modules
             .keys()
             .filter(move |name| globs.is_match(name))
             .cloned()
@@ -148,20 +151,21 @@ impl State {
     }
 
     pub fn disable_module(&mut self, env: &Env, module: &str) -> Result<()> {
-        self.packages.remove(module);
-        let paths = self
-            .module_paths
+        let state = self
+            .modules
             .get_mut(module)
             .expect("Whether `name` exists should be checked before calling this method");
+        state.clear_packages();
         // Paths are removed in reverse order to make sure directories are
         // removed last.
+        let paths = state.paths_mut();
         for i in (0..paths.len()).rev() {
             let (path, info) = &paths[i];
             info.remove_if_owned(env, path)?;
             self.paths.remove(path);
             paths.remove(i);
         }
-        self.module_paths.remove(module);
+        self.modules.remove(module);
         Ok(())
     }
 
