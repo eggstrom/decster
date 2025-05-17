@@ -16,7 +16,7 @@ impl App {
     pub fn run() -> Result<()> {
         let env = Env::load()?;
         config::load(&env)?;
-        let matches = Cli::command(true).get_matches();
+        let matches = Cli::command_with_aliases()?.get_matches();
         let cli = Cli::parse(&matches);
         let state = State::load(&env)?;
         let app = App { env, state };

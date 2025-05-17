@@ -39,6 +39,6 @@ impl<'a> AliasCli<'a> {
         let args = iter::once(program.as_str())
             .chain(config::alias(self.command)?)
             .chain(self.args.iter().copied());
-        Ok(Cli::command(false).get_matches_from(args))
+        Ok(Cli::command().get_matches_from(args))
     }
 }

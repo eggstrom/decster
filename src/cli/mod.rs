@@ -1,4 +1,5 @@
 use alias::AliasCli;
+use anyhow::{Result, bail};
 use clap::{ArgMatches, Command, arg, command};
 use disable::DisableCli;
 use enable::EnableCli;
@@ -27,8 +28,8 @@ pub struct Cli<'a> {
 }
 
 impl<'a> Cli<'a> {
-    pub fn command(aliases: bool) -> Command {
-        let mut cli = command!()
+    pub fn command() -> Command {
+        command!()
             .arg_required_else_help(true)
             .arg(arg!(-f --fetch "Re-fetch sources").global(true))
             .subcommand(EnableCli::command())
@@ -38,13 +39,18 @@ impl<'a> Cli<'a> {
             .subcommand(PathsCli::command())
             .subcommand(HashCli::command())
             .subcommand(SyncCli::command())
-            .subcommand(RunCli::command());
-        if aliases {
-            for (alias, command) in config::aliases() {
-                cli = cli.subcommand(AliasCli::command(alias, command));
+            .subcommand(RunCli::command())
+    }
+
+    pub fn command_with_aliases() -> Result<Command> {
+        let mut cli = Self::command();
+        for (name, command) in config::aliases() {
+            if cli.find_subcommand(name).is_some() {
+                bail!("Couldn't overwrite command `{name}` with an alias");
             }
+            cli = cli.subcommand(AliasCli::command(name, command));
         }
-        cli
+        Ok(cli)
     }
 
     pub fn parse(matches: &'a ArgMatches) -> Self {
