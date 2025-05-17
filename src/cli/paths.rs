@@ -16,7 +16,7 @@ impl PathsCli {
         if owned_paths.len() == 0 {
             println!("There are no owned paths");
         }
-        for (module, paths) in app.state.owned_paths() {
+        for (module, paths) in owned_paths {
             println!("Paths owned by module {}:", module.magenta());
             for (path, info) in paths {
                 println!("  {} ({})", app.env.tildefy(path).pretty(), info.kind());
