@@ -13,24 +13,31 @@ pub struct App {
 }
 
 impl App {
-    pub fn start() -> Result<()> {
+    pub fn run() -> Result<()> {
         let env = Env::load()?;
         config::load(&env)?;
-        let matches = Cli::command().get_matches();
-        let cli = Cli::parse(&matches)?;
+        let matches = Cli::command(true).get_matches();
+        let cli = Cli::parse(&matches);
         let state = State::load(&env)?;
         let app = App { env, state };
+        app.run_command(cli.command)
+    }
 
-        match cli.command {
-            CliCommand::Enable(command) => command.run(app)?,
-            CliCommand::Disable(command) => command.run(app)?,
-            CliCommand::Update(command) => command.run(app)?,
-            CliCommand::List(command) => command.run(app),
-            CliCommand::Paths(command) => command.run(app)?,
-            CliCommand::Hash(command) => command.run(app)?,
-            CliCommand::Sync(command) => command.run(app)?,
-            CliCommand::Run(command) => command.run(app),
-            CliCommand::Alias(command) => command.run(app)?,
+    fn run_command(self, command: CliCommand) -> Result<()> {
+        match command {
+            CliCommand::Enable(command) => command.run(self)?,
+            CliCommand::Disable(command) => command.run(self)?,
+            CliCommand::Update(command) => command.run(self)?,
+            CliCommand::List(command) => command.run(self),
+            CliCommand::Paths(command) => command.run(self)?,
+            CliCommand::Hash(command) => command.run(self)?,
+            CliCommand::Sync(command) => command.run(self)?,
+            CliCommand::Run(command) => command.run(self),
+            CliCommand::Alias(alias) => {
+                let matches = alias.matches()?;
+                let cli = Cli::parse(&matches);
+                self.run_command(cli.command)?;
+            }
         }
         Ok(())
     }

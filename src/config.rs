@@ -1,11 +1,11 @@
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashSet},
     fs,
     path::Path,
     sync::OnceLock,
 };
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use serde::Deserialize;
 
 use crate::{
@@ -24,7 +24,7 @@ pub struct Config {
     fetch: bool,
 
     #[serde(default)]
-    aliases: BTreeMap<String, String>,
+    aliases: BTreeMap<String, Vec<String>>,
 
     #[serde(skip, default)]
     modules: BTreeMap<String, Module>,
@@ -107,11 +107,30 @@ pub fn fetch() -> bool {
     config().fetch
 }
 
-pub fn aliases() -> impl Iterator<Item = (&'static str, &'static str)> {
+pub fn alias(name: &str) -> Result<impl Iterator<Item = &str>> {
+    let mut visited_aliases = HashSet::new();
+    let mut command = config().aliases.get(name);
+    while let Some(cmd) = command {
+        if let Some(nested_alias) = config().aliases.get(&cmd[0]) {
+            if visited_aliases.contains(cmd[0].as_str()) {
+                bail!("Couldn't resolve alias `{name}` due to infinite loop in alias definitions");
+            }
+            visited_aliases.insert(cmd[0].as_str());
+            command = Some(nested_alias);
+        } else {
+            break;
+        }
+    }
+    command
+        .map(|cmd| cmd.iter().map(|s| s.as_str()))
+        .ok_or(anyhow!("Couldn't find alias `{name}`"))
+}
+
+pub fn aliases() -> impl Iterator<Item = (&'static str, impl Iterator<Item = &'static str>)> {
     config()
         .aliases
         .iter()
-        .map(|(alias, command)| (alias.as_str(), command.as_str()))
+        .map(|(alias, command)| (alias.as_str(), command.iter().map(|s| s.as_str())))
 }
 
 pub fn has_static_source(name: &SourceName) -> bool {

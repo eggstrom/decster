@@ -1,5 +1,4 @@
 use alias::AliasCli;
-use anyhow::Result;
 use clap::{ArgMatches, Command, arg, command};
 use disable::DisableCli;
 use enable::EnableCli;
@@ -28,7 +27,7 @@ pub struct Cli<'a> {
 }
 
 impl<'a> Cli<'a> {
-    pub fn command() -> Command {
+    pub fn command(aliases: bool) -> Command {
         let mut cli = command!()
             .arg_required_else_help(true)
             .arg(arg!(-f --fetch "Re-fetch sources").global(true))
@@ -40,17 +39,19 @@ impl<'a> Cli<'a> {
             .subcommand(HashCli::command())
             .subcommand(SyncCli::command())
             .subcommand(RunCli::command());
-        for (alias, command) in config::aliases() {
-            cli = cli.subcommand(AliasCli::command(alias, command));
+        if aliases {
+            for (alias, command) in config::aliases() {
+                cli = cli.subcommand(AliasCli::command(alias, command));
+            }
         }
         cli
     }
 
-    pub fn parse(matches: &'a ArgMatches) -> Result<Self> {
+    pub fn parse(matches: &'a ArgMatches) -> Self {
         let Some((subcommand, matches)) = matches.subcommand() else {
             unreachable!()
         };
-        Ok(Cli {
+        Cli {
             fetch: matches.get_flag("fetch"),
             command: match subcommand {
                 "enable" => CliCommand::Enable(EnableCli::parse(matches)),
@@ -61,9 +62,9 @@ impl<'a> Cli<'a> {
                 "hash" => CliCommand::Hash(HashCli::parse(matches)),
                 "sync" => CliCommand::Sync(SyncCli::parse(matches)),
                 "run" => CliCommand::Run(RunCli::parse(matches)),
-                _ => CliCommand::Alias(AliasCli::parse(matches)),
+                _ => CliCommand::Alias(AliasCli::parse(subcommand, matches)),
             },
-        })
+        }
     }
 }
 
