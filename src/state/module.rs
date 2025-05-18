@@ -27,7 +27,7 @@ impl ModuleState {
     pub fn packages(&self) -> impl Iterator<Item = (PackageManager, impl Iterator<Item = &str>)> {
         self.packages
             .iter()
-            .map(|(m, p)| (*m, p.iter().map(|s| s.as_str())))
+            .map(|(manager, packages)| (*manager, packages.iter().map(|s| s.as_str())))
     }
 
     pub fn paths_mut(&mut self) -> &mut Vec<(PathBuf, PathInfo)> {
@@ -42,23 +42,36 @@ impl ModuleState {
         self.packages.clear();
     }
 
-    pub fn tree<'a>(&'a self, name: &'a str, globs: &Globs) -> Tree<Cow<'a, str>> {
-        let paths = self
+    pub fn tree<'a>(&'a self, name: &'a str, globs: &Globs) -> Option<Tree<Cow<'a, str>>> {
+        let paths: Vec<_> = self
             .paths
             .iter()
             .filter(|(path, _)| globs.is_match(path))
-            .map(|(path, info)| Cow::Owned(format!("{} ({})", path.pretty(), info.kind())));
-        let packages = self.packages.iter().map(|(manager, packages)| {
-            Tree::new(manager.to_string().into()).with_leaves(
-                packages
+            .map(|(path, info)| format!("{} ({})", path.pretty(), info.kind()).into())
+            .map(Tree::new)
+            .collect();
+        let packages: Vec<_> = self
+            .packages
+            .iter()
+            .filter_map(|(manager, packages)| {
+                let packages: Vec<Cow<_>> = packages
                     .iter()
                     .filter(|package| globs.is_match(package))
-                    .map(|s| Cow::Owned(s.as_str().magenta().to_string())),
-            )
-        });
-        Tree::new(name.magenta().to_string().into()).with_leaves([
-            Tree::new("Paths".into()).with_leaves(paths),
-            Tree::new("Packages".into()).with_leaves(packages),
-        ])
+                    .map(|s| s.as_str().magenta().to_string().into())
+                    .collect();
+                (!packages.is_empty())
+                    .then(|| Tree::new(manager.to_string().into()).with_leaves(packages))
+            })
+            .collect();
+
+        let leaves = [
+            (!paths.is_empty()).then(|| Tree::new("Paths".into()).with_leaves(paths)),
+            (!packages.is_empty()).then(|| Tree::new("Packages".into()).with_leaves(packages)),
+        ]
+        .into_iter()
+        .flatten();
+        let leaves = Vec::from_iter(leaves);
+        (!leaves.is_empty())
+            .then(|| Tree::new(name.magenta().to_string().into()).with_leaves(leaves))
     }
 }

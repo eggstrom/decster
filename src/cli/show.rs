@@ -29,13 +29,21 @@ impl<'a> ShowCli<'a> {
 
     pub fn run(&self, app: App) -> Result<()> {
         let globs = Globs::permissive(&self.queries)?;
-        let modules = app
+        let modules: Vec<_> = app
             .state
             .modules()
-            .map(|(name, state)| state.tree(name, &globs));
-        let tree = Tree::<Cow<_>>::new("State".into())
-            .with_leaves([Tree::new("Modules".into()).with_leaves(modules)]);
-        print!("{tree}");
+            .filter_map(|(name, state)| state.tree(name, &globs))
+            .collect();
+        let leaves =
+            [(!modules.is_empty()).then(|| Tree::new("Modules".into()).with_leaves(modules))]
+                .into_iter()
+                .flatten();
+        let leaves = Vec::from_iter(leaves);
+
+        if !leaves.is_empty() {
+            let tree = Tree::<Cow<_>>::new("State".into()).with_leaves(leaves);
+            print!("{tree}");
+        }
         Ok(())
     }
 }
