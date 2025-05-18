@@ -1,11 +1,11 @@
 use std::{
-    collections::{BTreeMap, BTreeSet, HashSet},
+    collections::{BTreeMap, BTreeSet, HashSet, VecDeque},
     fs,
     path::Path,
     sync::OnceLock,
 };
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 
 use crate::{
@@ -88,6 +88,22 @@ impl Config {
         }
         Ok(())
     }
+
+    pub fn alias(&self, name: &str) -> Result<impl Iterator<Item = &str>> {
+        let mut visited_aliases = HashSet::new();
+        let command = self.aliases.get(name).unwrap().iter().map(|s| s.as_str());
+        let mut command = VecDeque::from_iter(command);
+
+        while let Some(cmd) = self.aliases.get(command[0]) {
+            if visited_aliases.contains(cmd[0].as_str()) {
+                bail!("Couldn't resolve alias `{name}` due to infinite loop in alias definitions");
+            }
+            visited_aliases.insert(cmd[0].as_str());
+            command.pop_front();
+            cmd.iter().rev().for_each(|arg| command.push_front(arg))
+        }
+        Ok(command.into_iter())
+    }
 }
 
 static CONFIG: OnceLock<Config> = OnceLock::new();
@@ -111,22 +127,7 @@ pub fn fetch() -> bool {
 }
 
 pub fn alias(name: &str) -> Result<impl Iterator<Item = &str>> {
-    let mut visited_aliases = HashSet::new();
-    let mut command = config().aliases.get(name);
-    while let Some(cmd) = command {
-        if let Some(nested_alias) = config().aliases.get(&cmd[0]) {
-            if visited_aliases.contains(cmd[0].as_str()) {
-                bail!("Couldn't resolve alias `{name}` due to infinite loop in alias definitions");
-            }
-            visited_aliases.insert(cmd[0].as_str());
-            command = Some(nested_alias);
-        } else {
-            break;
-        }
-    }
-    command
-        .map(|cmd| cmd.iter().map(|s| s.as_str()))
-        .ok_or(anyhow!("Couldn't find alias `{name}`"))
+    config().alias(name)
 }
 
 pub fn aliases() -> impl Iterator<Item = (&'static str, impl Iterator<Item = &'static str>)> {
@@ -170,4 +171,39 @@ pub fn modules_matching_globs(
     globs: &Globs,
 ) -> impl Iterator<Item = (&'static str, &'static Module)> {
     modules().filter(move |(name, _)| globs.is_match(name))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use toml::toml;
+
+    #[test]
+    fn alias_resolution() {
+        let toml = toml! {
+            [aliases]
+            git = ["run", "git"]
+            g = ["git"]
+            ga = ["g", "add"]
+            gc = ["g", "commit"]
+            a = ["b"]
+            b = ["a"]
+        };
+        let config = toml::from_str::<Config>(&toml.to_string()).unwrap();
+        let aliases = [
+            ("git", Ok(vec!["run", "git"])),
+            ("g", Ok(vec!["run", "git"])),
+            ("ga", Ok(vec!["run", "git", "add"])),
+            ("gc", Ok(vec!["run", "git", "commit"])),
+            ("a", Err(())),
+            ("b", Err(())),
+        ];
+        for (alias, command) in aliases {
+            let result = config.alias(alias);
+            match command {
+                Ok(command) => assert_eq!(command, result.unwrap().collect::<Vec<_>>()),
+                Err(()) => assert!(result.is_err()),
+            }
+        }
+    }
 }
