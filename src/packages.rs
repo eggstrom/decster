@@ -7,14 +7,18 @@ use std::{
 
 use anyhow::{Context, Result};
 use bincode::{Decode, Encode};
-use derive_more::From;
+use derive_more::{Display, From};
 use itertools::Itertools;
 use serde::Deserialize;
 
-#[derive(Clone, Copy, Debug, Decode, Deserialize, Encode, Eq, From, Ord, PartialEq, PartialOrd)]
+#[derive(
+    Clone, Copy, Debug, Decode, Deserialize, Display, Encode, Eq, From, Ord, PartialEq, PartialOrd,
+)]
 #[serde(rename_all = "kebab-case", expecting = "a supported package manager")]
 pub enum PackageManager {
+    #[display("pacman")]
     Pacman,
+    #[display("paru")]
     Paru,
 }
 

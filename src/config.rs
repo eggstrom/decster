@@ -179,13 +179,13 @@ mod tests {
     use toml::toml;
 
     #[test]
-    fn alias_resolution() {
+    fn resolve_aliases() {
         let toml = toml! {
             [aliases]
             git = ["run", "git"]
             g = ["git"]
-            ga = ["g", "add"]
             gc = ["g", "commit"]
+            ga = ["g", "commit", "--amend"]
             a = ["b"]
             b = ["a"]
         };
@@ -193,8 +193,8 @@ mod tests {
         let aliases = [
             ("git", Ok(vec!["run", "git"])),
             ("g", Ok(vec!["run", "git"])),
-            ("ga", Ok(vec!["run", "git", "add"])),
             ("gc", Ok(vec!["run", "git", "commit"])),
+            ("ga", Ok(vec!["run", "git", "commit", "--amend"])),
             ("a", Err(())),
             ("b", Err(())),
         ];

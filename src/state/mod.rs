@@ -101,14 +101,6 @@ impl State {
             .push_path(path.to_path_buf(), info);
     }
 
-    pub fn owned_paths(
-        &self,
-    ) -> impl ExactSizeIterator<Item = (&str, impl Iterator<Item = (&Path, &PathInfo)>)> {
-        self.modules
-            .iter()
-            .map(|(name, state)| (name.as_str(), state.paths()))
-    }
-
     /// The reason for the return type containing `Cow<str>` is that it's later
     /// used in `PackageManager::diff`. That function uses
     /// `BTreeSet::difference`, which can't compare `&str` with `String`.
@@ -125,11 +117,17 @@ impl State {
         all_packages
     }
 
-    pub fn modules(&self) -> Vec<String> {
+    pub fn modules(&self) -> impl Iterator<Item = (&str, &ModuleState)> {
+        self.modules
+            .iter()
+            .map(|(name, state)| (name.as_str(), state))
+    }
+
+    pub fn module_names(&self) -> Vec<String> {
         self.modules.keys().cloned().collect()
     }
 
-    pub fn modules_matching_globs(&self, globs: &Globs) -> Vec<String> {
+    pub fn module_names_matching_globs(&self, globs: &Globs) -> Vec<String> {
         self.modules
             .keys()
             .filter(move |name| globs.is_match(name))

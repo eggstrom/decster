@@ -26,7 +26,7 @@ impl<'a> UpdateCli<'a> {
 
     pub fn run(&self, mut app: App) -> Result<()> {
         if self.modules.is_empty() {
-            let modules = app.state.modules();
+            let modules = app.state.module_names();
             match Self::run_inner(&mut app, &modules) {
                 Ok(false) => bail!("There are no enabled modules"),
                 Err(err) => eprintln!("{} {err:?}", "error:".red()),
@@ -34,7 +34,7 @@ impl<'a> UpdateCli<'a> {
             }
         } else {
             let globs = Globs::permissive(&self.modules)?;
-            let modules = app.state.modules_matching_globs(&globs);
+            let modules = app.state.module_names_matching_globs(&globs);
             match Self::run_inner(&mut app, &modules) {
                 Ok(false) => {
                     let modules = self.modules.as_slice();

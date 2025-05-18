@@ -26,7 +26,7 @@ impl<'a> DisableCli<'a> {
 
     pub fn run(&self, mut app: App) -> Result<()> {
         let globs = Globs::strict(&self.modules)?;
-        let matches = app.state.modules_matching_globs(&globs);
+        let matches = app.state.module_names_matching_globs(&globs);
         if matches.is_empty() {
             let modules = self.modules.as_slice();
             bail!("{} didn't match any enabled modules", modules.pretty());
