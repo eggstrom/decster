@@ -9,6 +9,7 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     env::Env,
+    globs::Globs,
     utils::{pretty::Pretty, sha256::Sha256Hash},
 };
 
@@ -39,6 +40,13 @@ impl SourceIdent {
         match self {
             SourceIdent::Named(name) => f(name),
             _ => false,
+        }
+    }
+
+    pub fn matches_globs(&self, globs: &Globs) -> bool {
+        match self {
+            SourceIdent::Named(name) => globs.is_match(name),
+            SourceIdent::Unnamed { module, path } => globs.is_match(module) || globs.is_match(path),
         }
     }
 

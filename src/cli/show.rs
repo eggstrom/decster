@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, fmt::Display, path::Path};
 
 use anyhow::Result;
 use clap::{ArgMatches, Command, arg};
@@ -35,22 +35,10 @@ impl<'a> ShowCli<'a> {
             .modules()
             .filter_map(|(name, state)| state.tree(name, &globs))
             .collect();
-        let static_sources: Vec<Cow<_>> = config::static_sources()
-            .filter(|source| globs.is_match(source))
-            .map(|source| {
-                let hash = Sha256Hash::from_path(&app.env.static_source_dir().join(source));
-                let hash = match hash {
-                    Ok(hash) => hash.to_string().yellow().to_string(),
-                    Err(err) => format!("{} {err:?}", "error".red()),
-                };
-                format!("{source}: {hash}").into()
-            })
-            .collect();
 
         let leaves = [
+            Self::sources(&app, &globs),
             (!modules.is_empty()).then(|| Tree::new("Modules".into()).with_leaves(modules)),
-            (!static_sources.is_empty())
-                .then(|| Tree::new("Static Sources".into()).with_leaves(static_sources)),
         ]
         .into_iter()
         .flatten();
@@ -61,5 +49,40 @@ impl<'a> ShowCli<'a> {
             print!("{tree}");
         }
         Ok(())
+    }
+
+    fn sources<'b>(app: &'b App, globs: &Globs) -> Option<Tree<Cow<'b, str>>> {
+        let static_sources: Vec<Cow<_>> = config::static_sources()
+            .filter(|source| globs.is_match(source))
+            .map(|name| Self::hash_string(name, &app.env.static_source_dir().join(name)).into())
+            .collect();
+        let dynamic_sources: Vec<Cow<_>> = app
+            .state
+            .sources()
+            .filter(|ident| ident.matches_globs(globs))
+            .map(|ident| Self::hash_string(ident, &ident.path(&app.env)).into())
+            .collect();
+
+        let leaves: Vec<_> = [
+            (!static_sources.is_empty())
+                .then(|| Tree::new("Static".into()).with_leaves(static_sources)),
+            (!dynamic_sources.is_empty())
+                .then(|| Tree::new("Dynamic".into()).with_leaves(dynamic_sources)),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        (!leaves.is_empty()).then(|| Tree::new("Sources".into()).with_leaves(leaves))
+    }
+
+    fn hash_string<D>(source: D, path: &Path) -> String
+    where
+        D: Display,
+    {
+        let hash = match Sha256Hash::from_path(path) {
+            Ok(hash) => hash.to_string().yellow().to_string(),
+            Err(err) => format!("{} {err:?}", "error".red()),
+        };
+        format!("{source}: {hash}")
     }
 }
