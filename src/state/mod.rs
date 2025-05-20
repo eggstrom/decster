@@ -55,11 +55,6 @@ impl State {
         self.sources.keys()
     }
 
-    pub fn sources_matching_globs(&self, globs: &Globs) -> impl Iterator<Item = &SourceIdent> {
-        self.sources()
-            .filter(move |ident| ident.is_named_and(|name| globs.is_match(name)))
-    }
-
     pub fn is_source_fetched(
         &self,
         env: &Env,

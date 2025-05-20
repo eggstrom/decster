@@ -149,10 +149,6 @@ pub fn static_sources() -> impl ExactSizeIterator<Item = &'static SourceName> {
     config().static_sources.iter()
 }
 
-pub fn static_sources_matching_globs(globs: &Globs) -> impl Iterator<Item = &'static SourceName> {
-    static_sources().filter(move |name| globs.is_match(name))
-}
-
 pub fn module(name: &str) -> Option<(&'static str, &'static Module)> {
     config()
         .modules

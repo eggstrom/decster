@@ -3,7 +3,6 @@ use anyhow::{Result, bail};
 use clap::{ArgMatches, Command, arg, command};
 use disable::DisableCli;
 use enable::EnableCli;
-use hash::HashCli;
 use run::RunCli;
 use show::ShowCli;
 use sync::SyncCli;
@@ -14,7 +13,6 @@ use crate::config;
 pub mod alias;
 pub mod disable;
 pub mod enable;
-pub mod hash;
 pub mod run;
 pub mod show;
 pub mod sync;
@@ -33,9 +31,8 @@ impl<'a> Cli<'a> {
             .subcommand(EnableCli::command())
             .subcommand(DisableCli::command())
             .subcommand(UpdateCli::command())
-            .subcommand(ShowCli::command())
-            .subcommand(HashCli::command())
             .subcommand(SyncCli::command())
+            .subcommand(ShowCli::command())
             .subcommand(RunCli::command())
     }
 
@@ -60,9 +57,8 @@ impl<'a> Cli<'a> {
                 "enable" => CliCommand::Enable(EnableCli::parse(matches)),
                 "disable" => CliCommand::Disable(DisableCli::parse(matches)),
                 "update" => CliCommand::Update(UpdateCli::parse(matches)),
-                "show" => CliCommand::Show(ShowCli::parse(matches)),
-                "hash" => CliCommand::Hash(HashCli::parse(matches)),
                 "sync" => CliCommand::Sync(SyncCli::parse(matches)),
+                "show" => CliCommand::Show(ShowCli::parse(matches)),
                 "run" => CliCommand::Run(RunCli::parse(matches)),
                 _ => CliCommand::Alias(AliasCli::parse(subcommand, matches)),
             },
@@ -74,9 +70,8 @@ pub enum CliCommand<'a> {
     Enable(EnableCli<'a>),
     Disable(DisableCli<'a>),
     Update(UpdateCli<'a>),
-    Show(ShowCli<'a>),
-    Hash(HashCli<'a>),
     Sync(SyncCli),
+    Show(ShowCli<'a>),
     Run(RunCli<'a>),
     Alias(AliasCli<'a>),
 }

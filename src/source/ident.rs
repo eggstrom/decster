@@ -33,16 +33,6 @@ impl SourceIdent {
         }
     }
 
-    pub fn is_named_and<F>(&self, f: F) -> bool
-    where
-        F: FnOnce(&SourceName) -> bool,
-    {
-        match self {
-            SourceIdent::Named(name) => f(name),
-            _ => false,
-        }
-    }
-
     pub fn matches_globs(&self, globs: &Globs) -> bool {
         match self {
             SourceIdent::Named(name) => globs.is_match(name),

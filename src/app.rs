@@ -28,9 +28,8 @@ impl App {
             CliCommand::Enable(command) => command.run(self)?,
             CliCommand::Disable(command) => command.run(self)?,
             CliCommand::Update(command) => command.run(self)?,
-            CliCommand::Show(command) => command.run(self)?,
-            CliCommand::Hash(command) => command.run(self)?,
             CliCommand::Sync(command) => command.run(self)?,
+            CliCommand::Show(command) => command.run(self)?,
             CliCommand::Run(command) => command.run(self),
             CliCommand::Alias(alias) => {
                 let matches = alias.matches()?;
