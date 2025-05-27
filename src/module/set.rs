@@ -18,7 +18,7 @@ use crate::{
 
 use super::{
     Module,
-    link::{LinkKind, ModuleLink},
+    link::{LinkKind, LinkMethod, ModuleLink},
     source::ModuleSource,
 };
 
@@ -87,10 +87,16 @@ impl<'a> ModuleSet<'a> {
         all_packages
     }
 
-    pub fn enable(&self, env: &mut Env, state: &mut State, name: &str) -> Result<()> {
+    pub fn enable(
+        &self,
+        env: &mut Env,
+        state: &mut State,
+        name: &str,
+        method: LinkMethod,
+    ) -> Result<()> {
         state.add_module(name, self.packages());
         for link in self.links(env)? {
-            link.create(env, state, name, &self.context()?)
+            link.create(env, state, name, &self.context()?, method)
                 .with_context(|| format!("Couldn't create link: {link}"))?
         }
         Ok(())

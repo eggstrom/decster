@@ -4,6 +4,7 @@ use clap::{ArgMatches, Command, arg, command};
 use crate::{app::App, config};
 
 pub mod alias;
+pub mod common_args;
 pub mod disable;
 pub mod enable;
 pub mod run;

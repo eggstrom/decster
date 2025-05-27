@@ -50,9 +50,9 @@ impl PathInfo {
                 }
                 PathInfo::Symlink { original } => path.read_link().is_ok_and(|o| o == *original),
             } {
-                PathState::Owned
+                PathState::Matches
             } else {
-                PathState::Changed
+                PathState::Differs
             }
         } else {
             PathState::Missing
@@ -65,14 +65,14 @@ impl PathInfo {
     {
         let path = path.as_ref();
         match self.state(path) {
-            PathState::Owned => {
+            PathState::Matches => {
                 if let PathKind::Directory = self.kind() {
                     let _ = fs::remove_dir(path);
                 } else {
                     fs::remove_file(path)?;
                 }
             }
-            PathState::Changed => {
+            PathState::Differs => {
                 eprintln!(
                     "{} Skipped {} (File has changed)",
                     "info:".yellow(),
@@ -110,8 +110,9 @@ impl Display for PathKind {
     }
 }
 
+#[derive(PartialEq)]
 pub enum PathState {
-    Owned,
-    Changed,
+    Matches,
+    Differs,
     Missing,
 }

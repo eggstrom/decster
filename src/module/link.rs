@@ -2,12 +2,13 @@ use std::{
     borrow::Cow,
     collections::HashMap,
     fs::{self, File},
-    io::Write,
+    io::{self, Write},
     os::unix::{self, fs::MetadataExt},
     path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result, bail};
+use clap::ArgMatches;
 use crossterm::style::Stylize;
 use derive_more::Display;
 use toml::Value;
@@ -15,7 +16,10 @@ use toml::Value;
 use crate::{
     env::Env,
     fs::{mode::Mode, owner::OwnerIds},
-    state::{State, path::PathInfo},
+    state::{
+        State,
+        path::{PathInfo, PathState},
+    },
     upon,
     utils::{pretty::Pretty, sha256::Sha256Hash},
 };
@@ -32,6 +36,27 @@ pub enum LinkKind {
     Symlink,
     #[display("{}", "Template".blue())]
     Template,
+}
+
+#[derive(Clone, Copy)]
+pub enum LinkMethod {
+    Fail,
+    Skip,
+    Take,
+    Ask,
+    Overwrite,
+}
+
+impl LinkMethod {
+    pub fn from_matches(matches: &ArgMatches) -> Self {
+        match () {
+            _ if matches.get_flag("skip") => LinkMethod::Skip,
+            _ if matches.get_flag("take") => LinkMethod::Take,
+            _ if matches.get_flag("ask") => LinkMethod::Ask,
+            _ if matches.get_flag("overwrite") => LinkMethod::Overwrite,
+            _ => LinkMethod::Fail,
+        }
+    }
 }
 
 #[derive(Display, Eq, Ord, PartialOrd)]
@@ -67,6 +92,7 @@ impl<'a> ModuleLink<'a> {
         state: &mut State,
         module: &str,
         context: &HashMap<&str, &Value>,
+        method: LinkMethod,
     ) -> Result<()> {
         let source_path = self.source.fetch(env, state, module, self.path)?;
         let link_path = env.untildefy(self.path)?;
@@ -81,29 +107,29 @@ impl<'a> ModuleLink<'a> {
             if state.is_path_owned(&new_path) {
                 bail!("Path is used by another module");
             } else if path.is_dir() {
-                if self.create_dir(state, module, &new_path)? {
+                if Self::create_dir(state, module, &new_path)? {
                     self.set_or_copy_permissions(env, path, &new_path)?;
                 }
-            } else {
-                let info = match self.kind {
-                    LinkKind::File => Self::create_file(path, &new_path),
-                    LinkKind::HardLink => Self::create_hard_link(path, &new_path),
-                    LinkKind::Symlink => Self::create_symlink(path, &new_path),
-                    LinkKind::Template => Self::create_template(path, &new_path, context),
-                }
-                .with_context(|| {
-                    let new_path = env.tildefy(new_path.as_ref());
-                    format!("Couldn't create {} ({})", new_path.pretty(), self.kind)
-                })?;
+            } else if let Some(info) = match self.kind {
+                LinkKind::File => Self::create_file(method, path, &new_path),
+                LinkKind::HardLink => Self::create_hard_link(method, path, &new_path),
+                LinkKind::Symlink => Self::create_symlink(method, path, &new_path),
+                LinkKind::Template => Self::create_template(method, path, &new_path, context),
+            }
+            .with_context(|| {
+                let new_path = env.tildefy(new_path.as_ref());
+                format!("Couldn't create {} ({})", new_path.pretty(), self.kind)
+            })? {
                 state.add_path(module, &new_path, info);
                 self.set_permissions(env, &new_path)?;
             }
+
             Ok(())
         })?;
         Ok(())
     }
 
-    fn create_dir(&self, state: &mut State, module: &str, path: &Path) -> Result<bool> {
+    fn create_dir(state: &mut State, module: &str, path: &Path) -> Result<bool> {
         Ok(if !path.is_dir() {
             fs::create_dir(path)
                 .with_context(|| format!("Couldn't create directory: {}", path.pretty()))?;
@@ -119,7 +145,7 @@ impl<'a> ModuleLink<'a> {
         if let Some(parent) = path.parent() {
             for component in parent.components() {
                 components.push(component);
-                if self.create_dir(state, module, &components)? {
+                if Self::create_dir(state, module, &components)? {
                     self.set_permissions(env, &components)?;
                 }
             }
@@ -127,37 +153,86 @@ impl<'a> ModuleLink<'a> {
         Ok(())
     }
 
-    fn create_file(from: &Path, to: &Path) -> Result<PathInfo> {
+    fn create_file(method: LinkMethod, from: &Path, to: &Path) -> Result<Option<PathInfo>> {
         let size = from.symlink_metadata()?.size();
         let hash = Sha256Hash::from_file(from)?;
-        crate::fs::copy(from, to)?;
-        Ok(PathInfo::File { size, hash })
+        let info = PathInfo::File { size, hash };
+        let got_path =
+            Self::create_with_method(to, &info, method, || Ok(crate::fs::copy(from, to)?))?;
+        Ok(got_path.then_some(info))
     }
 
-    fn create_hard_link(original: &Path, link: &Path) -> Result<PathInfo> {
+    fn create_hard_link(
+        method: LinkMethod,
+        original: &Path,
+        link: &Path,
+    ) -> Result<Option<PathInfo>> {
         let size = original.symlink_metadata()?.size();
         let hash = Sha256Hash::from_file(original)?;
-        fs::hard_link(original, link)?;
-        Ok(PathInfo::HardLink { size, hash })
+        let info = PathInfo::HardLink { size, hash };
+        let got_path =
+            Self::create_with_method(link, &info, method, || Ok(fs::hard_link(original, link)?))?;
+        Ok(got_path.then_some(info))
     }
 
-    fn create_symlink(original: &Path, link: &Path) -> Result<PathInfo> {
-        unix::fs::symlink(original, link)?;
-        let original = original.to_path_buf();
-        Ok(PathInfo::Symlink { original })
+    fn create_symlink(
+        method: LinkMethod,
+        original: &Path,
+        link: &Path,
+    ) -> Result<Option<PathInfo>> {
+        let info = PathInfo::Symlink {
+            original: original.to_path_buf(),
+        };
+        let got_path = Self::create_with_method(link, &info, method, || {
+            Ok(unix::fs::symlink(original, link)?)
+        })?;
+        Ok(got_path.then_some(info))
     }
 
     fn create_template(
+        method: LinkMethod,
         from: &Path,
         to: &Path,
         context: &HashMap<&str, &Value>,
-    ) -> Result<PathInfo> {
+    ) -> Result<Option<PathInfo>> {
         let template = fs::read_to_string(from)?;
         let render = upon::render(&template, context)?;
-        File::create_new(to)?.write_all(render.as_bytes())?;
         let size = render.len() as u64;
-        let hash = Sha256Hash::from_bytes(render);
-        Ok(PathInfo::File { size, hash })
+        let hash = Sha256Hash::from_bytes(&render);
+        let info = PathInfo::File { size, hash };
+        let got_path = Self::create_with_method(to, &info, method, || {
+            Ok(File::create_new(to)?.write_all(render.as_bytes())?)
+        })?;
+        Ok(got_path.then_some(info))
+    }
+
+    fn create_with_method<F>(path: &Path, info: &PathInfo, method: LinkMethod, f: F) -> Result<bool>
+    where
+        F: Fn() -> Result<()>,
+    {
+        Ok(match method {
+            LinkMethod::Take if info.state(path) == PathState::Matches => true,
+            LinkMethod::Take | LinkMethod::Fail => f().map(|()| true)?,
+            LinkMethod::Skip => f().is_ok(),
+            LinkMethod::Ask => {
+                print!("Overwrite {}? [y/N] ", path.pretty());
+                io::stdout().flush()?;
+                let mut input = "".to_string();
+                io::stdin().read_line(&mut input)?;
+                if input.trim().eq_ignore_ascii_case("y") && path.exists() {
+                    crate::fs::remove_all(path)?;
+                }
+                f()?;
+                true
+            }
+            LinkMethod::Overwrite => {
+                if path.exists() {
+                    crate::fs::remove_all(path)?;
+                }
+                f()?;
+                true
+            }
+        })
     }
 
     fn set_permissions(&self, env: &Env, path: &Path) -> Result<()> {

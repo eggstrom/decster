@@ -14,7 +14,7 @@ use path::PathInfo;
 use crate::{
     env::Env,
     globs::Globs,
-    module::set::ModuleSet,
+    module::{link::LinkMethod, set::ModuleSet},
     packages::PackageManager,
     source::{hashable::HashableSource, ident::SourceIdent},
     utils::pretty::Pretty,
@@ -130,9 +130,15 @@ impl State {
             .collect()
     }
 
-    pub fn enable_module(&mut self, env: &mut Env, name: &str, modules: ModuleSet) -> Result<()> {
+    pub fn enable_module(
+        &mut self,
+        env: &mut Env,
+        name: &str,
+        modules: ModuleSet,
+        method: LinkMethod,
+    ) -> Result<()> {
         if let Err(err) = modules
-            .enable(env, self, name)
+            .enable(env, self, name, method)
             .with_context(|| format!("Couldn't enable module {}", name.magenta()))
         {
             if let Err(err) = self.disable_module(env, name) {
@@ -167,10 +173,11 @@ impl State {
         env: &mut Env,
         name: &str,
         modules: Option<ModuleSet>,
+        method: LinkMethod,
     ) -> Result<()> {
         self.disable_module(env, name)?;
         if let Some(modules) = modules {
-            self.enable_module(env, name, modules)?;
+            self.enable_module(env, name, modules, method)?;
         }
         Ok(())
     }
