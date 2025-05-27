@@ -27,7 +27,9 @@ impl Paths {
             .map(PathBuf::from)
             .or(dirs::config_dir().map(|path| path.join(Self::APP_NAME)))
             .ok_or(anyhow!("Couldn't determine path of config directory"))?;
-        let data_dir = dirs::data_dir()
+        let data_dir = env::var_os("DECSTER_DATA")
+            .map(PathBuf::from)
+            .or(dirs::data_dir())
             .map(|path| path.join(Self::APP_NAME))
             .ok_or(anyhow!("Couldn't determine path of data directory"))?;
 
