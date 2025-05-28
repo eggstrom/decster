@@ -11,6 +11,8 @@ use derive_more::{Display, From};
 use itertools::Itertools;
 use serde::Deserialize;
 
+use crate::config;
+
 #[derive(
     Clone, Copy, Debug, Decode, Deserialize, Display, Encode, Eq, From, Ord, PartialEq, PartialOrd,
 )]
@@ -77,16 +79,19 @@ impl PackageManager {
     }
 
     fn update_packages<M: Manager>(args: &[&str], packages: &[&str]) -> io::Result<()> {
-        let mut command = Command::new(if M::NEEDS_ROOT { "sudo" } else { args[0] })
-            .args(if M::NEEDS_ROOT { args } else { &args[1..] })
-            .stdin(Stdio::piped())
-            .spawn()?;
-        let stdin = command.stdin.as_mut().unwrap();
+        let mut command = M::NEEDS_ROOT
+            .then(config::root_command)
+            .flatten()
+            .unwrap_or_else(|| Command::new(args[0]));
+        args.get(!M::NEEDS_ROOT as usize..)
+            .map(|args| command.args(args));
+        let mut child = command.stdin(Stdio::piped()).spawn()?;
+        let stdin = child.stdin.as_mut().unwrap();
         for package in packages {
             stdin.write_all(package.as_bytes())?;
             stdin.write_all(b"\n")?;
         }
-        command.wait()?;
+        child.wait()?;
         Ok(())
     }
 

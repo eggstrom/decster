@@ -2,6 +2,7 @@ use std::{
     collections::{BTreeMap, BTreeSet, HashSet, VecDeque},
     fs,
     path::Path,
+    process::Command,
     sync::OnceLock,
 };
 
@@ -23,6 +24,8 @@ pub struct Config {
     #[serde(default)]
     fetch: bool,
 
+    #[serde(default = "Config::default_root_command")]
+    root_command: Vec<String>,
     #[serde(default)]
     aliases: BTreeMap<String, Vec<String>>,
 
@@ -54,6 +57,10 @@ impl Config {
             .transpose()
             .with_context(|| format!("Couldn't parse {}", path.pretty()))?
             .unwrap_or_default())
+    }
+
+    fn default_root_command() -> Vec<String> {
+        vec!["sudo".to_string()]
     }
 
     fn load_modules(&mut self, dir: &Path) -> Result<()> {
@@ -124,6 +131,15 @@ fn config() -> &'static Config {
 
 pub fn fetch() -> bool {
     config().fetch
+}
+
+pub fn root_command() -> Option<Command> {
+    let root_command = &config().root_command;
+    (!root_command.is_empty()).then(|| {
+        let mut command = Command::new(&root_command[0]);
+        root_command.get(1..).map(|args| command.args(args));
+        command
+    })
 }
 
 pub fn alias(name: &str) -> Result<impl Iterator<Item = &str>> {
